@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
-
 import '../../core/constants/app_colors.dart';
+import '../complaints/report_issue_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -265,6 +265,14 @@ class _HomeScreenState extends State<HomeScreen> {
                 icon: Icons.add_rounded,
                 title: 'Report',
                 subtitle: 'Issue',
+                onTap: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => const ReportIssueScreen(),
+                    ),
+                  );
+                },
               ),
             ),
 
@@ -350,54 +358,59 @@ class _QuickActionCard extends StatelessWidget {
   final IconData icon;
   final String title;
   final String subtitle;
+  final VoidCallback? onTap;
 
   const _QuickActionCard({
     required this.icon,
     required this.title,
     required this.subtitle,
+    this.onTap,
   });
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      height: 125,
-      decoration: BoxDecoration(
-        color: const Color(0xFFEAF6FD),
-        borderRadius: BorderRadius.circular(18),
-      ),
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Container(
-            width: 58,
-            height: 58,
-            decoration: BoxDecoration(
-              color: AppColors.lightBlue.withValues(alpha: 0.25),
-              shape: BoxShape.circle,
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        height: 125,
+        decoration: BoxDecoration(
+          color: const Color(0xFFEAF6FD),
+          borderRadius: BorderRadius.circular(18),
+        ),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Container(
+              width: 58,
+              height: 58,
+              decoration: BoxDecoration(
+                color: AppColors.lightBlue.withValues(alpha: 0.25),
+                shape: BoxShape.circle,
+              ),
+              child: Icon(icon, color: AppColors.primaryBlue, size: 38),
             ),
-            child: Icon(icon, color: AppColors.primaryBlue, size: 38),
-          ),
 
-          const SizedBox(height: 11),
+            const SizedBox(height: 11),
 
-          Text(
-            title,
-            style: const TextStyle(
-              color: Colors.black,
-              fontSize: 14,
-              fontWeight: FontWeight.bold,
+            Text(
+              title,
+              style: const TextStyle(
+                color: Colors.black,
+                fontSize: 14,
+                fontWeight: FontWeight.bold,
+              ),
             ),
-          ),
 
-          Text(
-            subtitle,
-            style: const TextStyle(
-              color: Colors.black,
-              fontSize: 14,
-              fontWeight: FontWeight.bold,
+            Text(
+              subtitle,
+              style: const TextStyle(
+                color: Colors.black,
+                fontSize: 14,
+                fontWeight: FontWeight.bold,
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }

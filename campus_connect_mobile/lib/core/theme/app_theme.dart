@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+
 import '../constants/app_colors.dart';
 
 class AppTheme {
@@ -8,6 +9,9 @@ class AppTheme {
     useMaterial3: true,
     fontFamily: 'Roboto',
     scaffoldBackgroundColor: AppColors.background,
-    colorScheme: ColorScheme.fromSeed(seedColor: AppColors.primaryBlue),
+    colorScheme: ColorScheme.fromSeed(
+      seedColor: AppColors.primaryBlue,
+      brightness: Brightness.light,
+    ),
   );
 }
