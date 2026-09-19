@@ -1,11 +1,17 @@
+import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
+
 import 'core/services/admin_repository.dart';
 import 'core/theme/app_theme.dart';
+import 'firebase_options.dart';
 import 'screens/auth/admin_login_screen.dart';
 import 'widgets/navigation/admin_layout.dart';
 
-void main() {
+Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
+  await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
+
   runApp(const CampusConnectAdminApp());
 }
 
@@ -41,7 +47,9 @@ class _CampusConnectAdminAppState extends State<CampusConnectAdminApp> {
           title: 'CampusConnect Admin Portal',
           debugShowCheckedModeBanner: false,
           theme: AppTheme.lightTheme,
-          home: _repository.isAuthenticated
+          home: _repository.isInitializing
+              ? const Scaffold(body: Center(child: CircularProgressIndicator()))
+              : _repository.isAuthenticated
               ? AdminLayout(repository: _repository)
               : AdminLoginScreen(repository: _repository),
         );

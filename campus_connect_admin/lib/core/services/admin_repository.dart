@@ -1,37 +1,191 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
+
 import '../models/models.dart';
 
 /// Central state management and repository for the CampusConnect Admin portal.
-/// Handles in-memory data for users, complaints, and events without external dependencies.
+///
+/// Handles:
+/// - Firebase Authentication
+/// - Admin authorization using Firestore
+/// - Admin session restoration after browser refresh
+/// - In-memory users, complaints, and events data
 class AdminRepository extends ChangeNotifier {
-  // Auth state
-  bool _isAuthenticated = true;
-  final String _adminName = 'Dr. Rajesh Sharma';
-  String _adminEmail = 'admin@campusconnect.edu';
-  final String _adminRole = 'Chief Campus Administrator';
+  final FirebaseAuth _auth = FirebaseAuth.instance;
+  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+
+  // ============================================================
+  // AUTHENTICATION STATE
+  // ============================================================
+
+  bool _isAuthenticated = false;
+  bool _isInitializing = true;
+
+  String _adminName = '';
+  String _adminEmail = '';
+  String _adminRole = '';
 
   bool get isAuthenticated => _isAuthenticated;
+  bool get isInitializing => _isInitializing;
   String get adminName => _adminName;
   String get adminEmail => _adminEmail;
   String get adminRole => _adminRole;
 
-  bool login(String email, String password) {
-    // Simple local credential check for administration portal
-    if (email.trim().isNotEmpty && password.trim().isNotEmpty) {
-      _isAuthenticated = true;
-      _adminEmail = email.trim();
-      notifyListeners();
-      return true;
-    }
-    return false;
+  /// Starts Firebase session restoration.
+  ///
+  /// Future.microtask ensures that the UI has time to attach
+  /// its listener before the initialization state changes.
+  AdminRepository() {
+    Future.microtask(_restoreSession);
   }
 
-  void logout() {
+  /// Restores the Firebase authentication session after
+  /// a browser refresh or reopening the application.
+  Future<void> _restoreSession() async {
+    try {
+      final user = _auth.currentUser;
+
+      // No Firebase user means the admin is logged out.
+      if (user == null) {
+        _isAuthenticated = false;
+        return;
+      }
+
+      // Get the corresponding Firestore user document.
+      final userDocument = await _firestore
+          .collection('USERS')
+          .doc(user.uid)
+          .get();
+
+      // Firebase account exists but there is no matching
+      // Firestore profile.
+      if (!userDocument.exists) {
+        await _auth.signOut();
+        _isAuthenticated = false;
+        return;
+      }
+
+      final data = userDocument.data();
+
+      // Only users with the Admin role can access
+      // the administration portal.
+      if (data == null || data['role'] != 'Admin') {
+        await _auth.signOut();
+        _isAuthenticated = false;
+        return;
+      }
+
+      // Restore admin profile information from Firestore.
+      _adminName = data['name']?.toString() ?? 'Administrator';
+      _adminEmail = data['email']?.toString() ?? user.email ?? '';
+      _adminRole = data['role']?.toString() ?? 'Admin';
+
+      _isAuthenticated = true;
+    } catch (_) {
+      // If session restoration fails, keep the user logged out.
+      _isAuthenticated = false;
+    } finally {
+      _isInitializing = false;
+      notifyListeners();
+    }
+  }
+
+  /// Signs in using Firebase Authentication and verifies that
+  /// the authenticated account has the Admin role in Firestore.
+  ///
+  /// Returns:
+  /// - null when login succeeds
+  /// - error message when login fails
+  Future<String?> login(String email, String password) async {
+    try {
+      final credential = await _auth.signInWithEmailAndPassword(
+        email: email.trim(),
+        password: password,
+      );
+
+      final user = credential.user;
+
+      if (user == null) {
+        return 'Unable to sign in. Please try again.';
+      }
+
+      // Get the user's Firestore profile using the Firebase UID.
+      final userDocument = await _firestore
+          .collection('USERS')
+          .doc(user.uid)
+          .get();
+
+      // Firebase account exists, but there is no corresponding
+      // USERS document.
+      if (!userDocument.exists) {
+        await _auth.signOut();
+        return 'Admin profile not found.';
+      }
+
+      final data = userDocument.data();
+
+      // Only Admin accounts are allowed into the Admin portal.
+      if (data == null || data['role'] != 'Admin') {
+        await _auth.signOut();
+        return 'Access denied. This account is not an administrator.';
+      }
+
+      // Store profile information from Firestore.
+      _isAuthenticated = true;
+      _adminName = data['name']?.toString() ?? 'Administrator';
+      _adminEmail = data['email']?.toString() ?? user.email ?? email.trim();
+      _adminRole = data['role']?.toString() ?? 'Admin';
+
+      notifyListeners();
+
+      return null;
+    } on FirebaseAuthException catch (e) {
+      switch (e.code) {
+        case 'invalid-credential':
+        case 'invalid-login-credentials':
+          return 'Invalid email or password.';
+
+        case 'user-disabled':
+          return 'This account has been disabled.';
+
+        case 'too-many-requests':
+          return 'Too many login attempts. Please try again later.';
+
+        case 'network-request-failed':
+          return 'Network error. Please check your internet connection.';
+
+        case 'user-not-found':
+          return 'No account found with this email.';
+
+        case 'wrong-password':
+          return 'Invalid email or password.';
+
+        default:
+          return 'Unable to sign in. Please try again.';
+      }
+    } catch (_) {
+      return 'Something went wrong. Please try again.';
+    }
+  }
+
+  /// Signs the administrator out from Firebase Authentication
+  /// and clears the local admin session.
+  Future<void> logout() async {
+    await _auth.signOut();
+
     _isAuthenticated = false;
+    _adminName = '';
+    _adminEmail = '';
+    _adminRole = '';
+
     notifyListeners();
   }
 
-  // Initial realistic college users
+  // ============================================================
+  // INITIAL REALISTIC COLLEGE USERS
+  // ============================================================
+
   final List<UserModel> _users = [
     UserModel(
       memberCode: 'ADM-001',
@@ -95,7 +249,10 @@ class AdminRepository extends ChangeNotifier {
     ),
   ];
 
-  // Initial realistic campus complaints
+  // ============================================================
+  // INITIAL REALISTIC CAMPUS COMPLAINTS
+  // ============================================================
+
   final List<ComplaintModel> _complaints = [
     ComplaintModel(
       id: 'CMP-2026-101',
@@ -171,7 +328,10 @@ class AdminRepository extends ChangeNotifier {
     ),
   ];
 
-  // Initial realistic campus events
+  // ============================================================
+  // INITIAL REALISTIC CAMPUS EVENTS
+  // ============================================================
+
   final List<EventModel> _events = [
     EventModel(
       id: 'EVT-2026-01',
@@ -205,32 +365,48 @@ class AdminRepository extends ChangeNotifier {
     ),
   ];
 
-  // Getters
+  // ============================================================
+  // GETTERS
+  // ============================================================
+
   List<UserModel> get users => List.unmodifiable(_users);
+
   List<ComplaintModel> get complaints => List.unmodifiable(_complaints);
+
   List<EventModel> get events => List.unmodifiable(_events);
 
-  // Dashboard Metrics
+  // ============================================================
+  // DASHBOARD METRICS
+  // ============================================================
+
   int get totalUsers => _users.length;
+
   int get totalComplaints => _complaints.length;
+
   int get pendingComplaints =>
       _complaints.where((c) => c.status == 'Pending').length;
+
   int get resolvedComplaints =>
       _complaints.where((c) => c.status == 'Resolved').length;
 
   List<ComplaintModel> get recentComplaints {
     final sorted = List<ComplaintModel>.from(_complaints)
       ..sort((a, b) => b.reportedAt.compareTo(a.reportedAt));
+
     return sorted.take(5).toList();
   }
 
   List<UserModel> get recentUsers {
     final sorted = List<UserModel>.from(_users)
       ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
+
     return sorted.take(5).toList();
   }
 
-  // User Actions
+  // ============================================================
+  // USER ACTIONS
+  // ============================================================
+
   bool isMemberCodeExists(String code) {
     return _users.any(
       (u) => u.memberCode.trim().toLowerCase() == code.trim().toLowerCase(),
@@ -249,8 +425,12 @@ class AdminRepository extends ChangeNotifier {
   }
 
   List<UserModel> searchUsers(String query) {
-    if (query.trim().isEmpty) return _users;
+    if (query.trim().isEmpty) {
+      return _users;
+    }
+
     final q = query.trim().toLowerCase();
+
     return _users.where((user) {
       return user.name.toLowerCase().contains(q) ||
           user.memberCode.toLowerCase().contains(q) ||
@@ -260,7 +440,10 @@ class AdminRepository extends ChangeNotifier {
     }).toList();
   }
 
-  // Complaint Actions
+  // ============================================================
+  // COMPLAINT ACTIONS
+  // ============================================================
+
   ComplaintModel? getComplaintById(String id) {
     try {
       return _complaints.firstWhere((c) => c.id == id);
@@ -271,13 +454,18 @@ class AdminRepository extends ChangeNotifier {
 
   void updateComplaintStatus(String id, String newStatus) {
     final index = _complaints.indexWhere((c) => c.id == id);
+
     if (index != -1) {
       _complaints[index] = _complaints[index].copyWith(status: newStatus);
+
       notifyListeners();
     }
   }
 
-  // Event Actions
+  // ============================================================
+  // EVENT ACTIONS
+  // ============================================================
+
   void addEvent(EventModel event) {
     _events.insert(0, event);
     notifyListeners();
@@ -285,14 +473,17 @@ class AdminRepository extends ChangeNotifier {
 
   void updateEventStatus(String id, String newStatus) {
     final index = _events.indexWhere((e) => e.id == id);
+
     if (index != -1) {
       _events[index] = _events[index].copyWith(status: newStatus);
+
       notifyListeners();
     }
   }
 
   void editEvent(EventModel updatedEvent) {
     final index = _events.indexWhere((e) => e.id == updatedEvent.id);
+
     if (index != -1) {
       _events[index] = updatedEvent;
       notifyListeners();

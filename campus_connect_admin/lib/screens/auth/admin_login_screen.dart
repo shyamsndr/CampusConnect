@@ -14,9 +14,8 @@ class AdminLoginScreen extends StatefulWidget {
 
 class _AdminLoginScreenState extends State<AdminLoginScreen> {
   final _formKey = GlobalKey<FormState>();
-  final _emailController =
-      TextEditingController(text: 'admin@campusconnect.edu');
-  final _passwordController = TextEditingController(text: 'Admin@2026');
+  final _emailController = TextEditingController();
+  final _passwordController = TextEditingController();
   bool _obscurePassword = true;
   bool _isLoading = false;
   String? _errorMessage;
@@ -28,7 +27,7 @@ class _AdminLoginScreenState extends State<AdminLoginScreen> {
     super.dispose();
   }
 
-  void _handleLogin() {
+  Future<void> _handleLogin() async {
     setState(() {
       _errorMessage = null;
     });
@@ -41,16 +40,16 @@ class _AdminLoginScreenState extends State<AdminLoginScreen> {
       _isLoading = true;
     });
 
-    final success = widget.repository.login(
+    final error = await widget.repository.login(
       _emailController.text,
       _passwordController.text,
     );
 
+    if (!mounted) return;
+
     setState(() {
       _isLoading = false;
-      if (!success) {
-        _errorMessage = 'Invalid administrator credentials';
-      }
+      _errorMessage = error;
     });
   }
 
@@ -119,7 +118,9 @@ class _AdminLoginScreenState extends State<AdminLoginScreen> {
                     if (_errorMessage != null) ...[
                       Container(
                         padding: const EdgeInsets.symmetric(
-                            horizontal: 14, vertical: 10),
+                          horizontal: 14,
+                          vertical: 10,
+                        ),
                         decoration: BoxDecoration(
                           color: const Color(0xFFFEE2E2),
                           borderRadius: BorderRadius.circular(6),
@@ -230,8 +231,9 @@ class _AdminLoginScreenState extends State<AdminLoginScreen> {
                               height: 18,
                               child: CircularProgressIndicator(
                                 strokeWidth: 2,
-                                valueColor:
-                                    AlwaysStoppedAnimation<Color>(Colors.white),
+                                valueColor: AlwaysStoppedAnimation<Color>(
+                                  Colors.white,
+                                ),
                               ),
                             )
                           : const Text('Sign In to Admin Portal'),
