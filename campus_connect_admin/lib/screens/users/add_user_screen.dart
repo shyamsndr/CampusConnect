@@ -1,9 +1,10 @@
 import 'package:flutter/material.dart';
+
 import '../../core/constants/app_colors.dart';
 import '../../core/models/models.dart';
 import '../../core/services/admin_repository.dart';
 
-/// Screen for adding pre-authorized college members (Students & Staff).
+/// Screen for adding a college member (Student or Staff).
 class AddUserScreen extends StatefulWidget {
   final AdminRepository repository;
   final VoidCallback onUserAdded;
@@ -30,18 +31,11 @@ class _AddUserScreenState extends State<AddUserScreen> {
   final _phoneController = TextEditingController();
 
   String _selectedRole = 'Student';
+  String _selectedDepartment = 'MCA';
+
   bool _isSubmitting = false;
 
-  final List<String> _departments = [
-    'Computer Science',
-    'Information Technology',
-    'Electronics & Comm.',
-    'Mechanical Engineering',
-    'Civil Engineering',
-    'Electrical Engineering',
-    'Science & Humanities',
-    'Administration',
-  ];
+  final List<String> _departments = ['MCA', 'MBA'];
 
   @override
   void dispose() {
@@ -61,6 +55,7 @@ class _AddUserScreenState extends State<AddUserScreen> {
     final memberCode = _memberCodeController.text.trim();
     final email = _emailController.text.trim();
 
+    // Check for duplicate member code.
     if (widget.repository.isMemberCodeExists(memberCode)) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -71,6 +66,7 @@ class _AddUserScreenState extends State<AddUserScreen> {
       return;
     }
 
+    // Check for duplicate email.
     if (widget.repository.isEmailExists(email)) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -90,9 +86,7 @@ class _AddUserScreenState extends State<AddUserScreen> {
       name: _nameController.text.trim(),
       email: email,
       role: _selectedRole,
-      department: _departmentController.text.trim().isNotEmpty
-          ? _departmentController.text.trim()
-          : 'General',
+      department: _selectedDepartment,
       phone: _phoneController.text.trim().isNotEmpty
           ? _phoneController.text.trim()
           : '-',
@@ -108,9 +102,7 @@ class _AddUserScreenState extends State<AddUserScreen> {
 
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Text(
-          'Successfully authorized $memberCode (${newUser.name}) as $_selectedRole.',
-        ),
+        content: Text('Successfully added ${newUser.name} as $_selectedRole.'),
         backgroundColor: AppColors.statusResolvedText,
       ),
     );
@@ -128,11 +120,16 @@ class _AddUserScreenState extends State<AddUserScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              // Header with Back action
+              // ============================================================
+              // HEADER
+              // ============================================================
               Row(
                 children: [
                   IconButton(
-                    icon: const Icon(Icons.arrow_back, color: AppColors.textDark),
+                    icon: const Icon(
+                      Icons.arrow_back,
+                      color: AppColors.textDark,
+                    ),
                     onPressed: widget.onCancel,
                     tooltip: 'Back to Users',
                   ),
@@ -141,7 +138,7 @@ class _AddUserScreenState extends State<AddUserScreen> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        'Add Authorized Member',
+                        'Add User',
                         style: TextStyle(
                           fontSize: 20,
                           fontWeight: FontWeight.w700,
@@ -151,7 +148,7 @@ class _AddUserScreenState extends State<AddUserScreen> {
                       ),
                       SizedBox(height: 2),
                       Text(
-                        'Pre-authorize a college student or staff before mobile app registration.',
+                        'Add a student or staff member to CampusConnect.',
                         style: TextStyle(
                           fontSize: 13,
                           color: AppColors.textGrey,
@@ -164,7 +161,9 @@ class _AddUserScreenState extends State<AddUserScreen> {
 
               const SizedBox(height: 24),
 
-              // Form Container
+              // ============================================================
+              // FORM
+              // ============================================================
               Container(
                 padding: const EdgeInsets.all(28),
                 decoration: BoxDecoration(
@@ -177,42 +176,9 @@ class _AddUserScreenState extends State<AddUserScreen> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
-                      // Notice banner
-                      Container(
-                        padding: const EdgeInsets.all(12),
-                        decoration: BoxDecoration(
-                          color: AppColors.primaryLight,
-                          borderRadius: BorderRadius.circular(6),
-                          border: Border.all(
-                            color: const Color(0xFFBFDBFE),
-                            width: 1,
-                          ),
-                        ),
-                        child: const Row(
-                          children: [
-                            Icon(
-                              Icons.info_outline,
-                              color: AppColors.primary,
-                              size: 18,
-                            ),
-                            SizedBox(width: 10),
-                            Expanded(
-                              child: Text(
-                                'Members will be able to register and log in on the mobile app once their member code and email match these authorized records.',
-                                style: TextStyle(
-                                  fontSize: 12,
-                                  color: AppColors.textDark,
-                                  height: 1.4,
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-
-                      const SizedBox(height: 24),
-
-                      // Member Code & Role
+                      // ====================================================
+                      // MEMBER CODE + ROLE
+                      // ====================================================
                       Row(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
@@ -234,16 +200,17 @@ class _AddUserScreenState extends State<AddUserScreen> {
                                   textCapitalization:
                                       TextCapitalization.characters,
                                   decoration: const InputDecoration(
-                                    hintText: 'e.g. STU-2024-150 / STF-305',
+                                    hintText: 'e.g. MCA2026001',
                                   ),
                                   validator: (value) {
-                                    if (value == null ||
-                                        value.trim().isEmpty) {
+                                    if (value == null || value.trim().isEmpty) {
                                       return 'Member code is required';
                                     }
+
                                     if (value.trim().length < 3) {
                                       return 'Must be at least 3 characters';
                                     }
+
                                     return null;
                                   },
                                 ),
@@ -293,7 +260,9 @@ class _AddUserScreenState extends State<AddUserScreen> {
 
                       const SizedBox(height: 18),
 
-                      // Full Name
+                      // ====================================================
+                      // FULL NAME
+                      // ====================================================
                       const Text(
                         'Full Name *',
                         style: TextStyle(
@@ -306,19 +275,22 @@ class _AddUserScreenState extends State<AddUserScreen> {
                       TextFormField(
                         controller: _nameController,
                         decoration: const InputDecoration(
-                          hintText: 'e.g. Anjali Verma',
+                          hintText: 'e.g. Walter White',
                         ),
                         validator: (value) {
                           if (value == null || value.trim().isEmpty) {
                             return 'Full name is required';
                           }
+
                           return null;
                         },
                       ),
 
                       const SizedBox(height: 18),
 
-                      // Email
+                      // ====================================================
+                      // EMAIL
+                      // ====================================================
                       const Text(
                         'Email Address *',
                         style: TextStyle(
@@ -332,22 +304,26 @@ class _AddUserScreenState extends State<AddUserScreen> {
                         controller: _emailController,
                         keyboardType: TextInputType.emailAddress,
                         decoration: const InputDecoration(
-                          hintText: 'e.g. anjali.v@student.college.edu',
+                          hintText: 'e.g. walterwhite@gmail.com',
                         ),
                         validator: (value) {
                           if (value == null || value.trim().isEmpty) {
                             return 'Email address is required';
                           }
+
                           if (!value.contains('@') || !value.contains('.')) {
                             return 'Please enter a valid email address';
                           }
+
                           return null;
                         },
                       ),
 
                       const SizedBox(height: 18),
 
-                      // Department & Phone
+                      // ====================================================
+                      // DEPARTMENT + PHONE
+                      // ====================================================
                       Row(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
@@ -365,17 +341,20 @@ class _AddUserScreenState extends State<AddUserScreen> {
                                 ),
                                 const SizedBox(height: 6),
                                 DropdownButtonFormField<String>(
-                                  initialValue: _departments.first,
+                                  initialValue: _selectedDepartment,
                                   decoration: const InputDecoration(),
-                                  items: _departments.map((dept) {
-                                    return DropdownMenuItem(
-                                      value: dept,
-                                      child: Text(dept),
+                                  items: _departments.map((department) {
+                                    return DropdownMenuItem<String>(
+                                      value: department,
+                                      child: Text(department),
                                     );
                                   }).toList(),
                                   onChanged: (value) {
                                     if (value != null) {
-                                      _departmentController.text = value;
+                                      setState(() {
+                                        _selectedDepartment = value;
+                                        _departmentController.text = value;
+                                      });
                                     }
                                   },
                                 ),
@@ -400,7 +379,7 @@ class _AddUserScreenState extends State<AddUserScreen> {
                                   controller: _phoneController,
                                   keyboardType: TextInputType.phone,
                                   decoration: const InputDecoration(
-                                    hintText: 'e.g. +91 98765 00000',
+                                    hintText: 'e.g. +91 98765 43210',
                                   ),
                                 ),
                               ],
@@ -411,7 +390,9 @@ class _AddUserScreenState extends State<AddUserScreen> {
 
                       const SizedBox(height: 32),
 
-                      // Actions
+                      // ====================================================
+                      // ACTION BUTTONS
+                      // ====================================================
                       Row(
                         mainAxisAlignment: MainAxisAlignment.end,
                         children: [
@@ -421,20 +402,21 @@ class _AddUserScreenState extends State<AddUserScreen> {
                           ),
                           const SizedBox(width: 12),
                           ElevatedButton.icon(
-                            icon: const Icon(Icons.check, size: 18),
-                            label: _isSubmitting
+                            icon: _isSubmitting
                                 ? const SizedBox(
                                     width: 16,
                                     height: 16,
                                     child: CircularProgressIndicator(
                                       strokeWidth: 2,
-                                      valueColor:
-                                          AlwaysStoppedAnimation<Color>(
+                                      valueColor: AlwaysStoppedAnimation<Color>(
                                         Colors.white,
                                       ),
                                     ),
                                   )
-                                : const Text('Add User'),
+                                : const Icon(Icons.check, size: 18),
+                            label: Text(
+                              _isSubmitting ? 'Adding...' : 'Add User',
+                            ),
                             onPressed: _isSubmitting ? null : _handleSubmit,
                           ),
                         ],
