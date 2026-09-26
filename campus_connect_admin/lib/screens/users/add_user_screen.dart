@@ -47,68 +47,67 @@ class _AddUserScreenState extends State<AddUserScreen> {
     super.dispose();
   }
 
-  void _handleSubmit() {
+  Future<void> _handleSubmit() async {
     if (!_formKey.currentState!.validate()) {
       return;
     }
 
-    final memberCode = _memberCodeController.text.trim();
-    final email = _emailController.text.trim();
-
-    // Check for duplicate member code.
-    if (widget.repository.isMemberCodeExists(memberCode)) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Member code "$memberCode" is already registered.'),
-          backgroundColor: Colors.redAccent,
-        ),
-      );
-      return;
-    }
-
-    // Check for duplicate email.
-    if (widget.repository.isEmailExists(email)) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Email "$email" is already registered.'),
-          backgroundColor: Colors.redAccent,
-        ),
-      );
-      return;
-    }
+    // Prevent double-submission while a request is in flight.
+    if (_isSubmitting) return;
 
     setState(() {
       _isSubmitting = true;
     });
 
+    final memberCode = _memberCodeController.text.trim().toUpperCase();
+    final phone = _phoneController.text.trim();
+
     final newUser = UserModel(
       memberCode: memberCode,
       name: _nameController.text.trim(),
-      email: email,
+      email: _emailController.text.trim().toLowerCase(),
       role: _selectedRole,
       department: _selectedDepartment,
-      phone: _phoneController.text.trim().isNotEmpty
-          ? _phoneController.text.trim()
-          : '-',
+      phone: phone.isNotEmpty ? phone : '-',
       status: 'Active',
       createdAt: DateTime.now(),
     );
 
-    widget.repository.addUser(newUser);
+    final error = await widget.repository.addUser(newUser);
+
+    // Guard against the widget being unmounted while the async call was in flight.
+    if (!mounted) return;
 
     setState(() {
       _isSubmitting = false;
     });
 
+    if (error != null) {
+      // Show the user-facing error returned by the backend.
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(error),
+          backgroundColor: Colors.redAccent,
+          duration: const Duration(seconds: 4),
+        ),
+      );
+      return;
+    }
+
+    // Success: notify admin and navigate back.
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text('Successfully added ${newUser.name} as $_selectedRole.'),
+      const SnackBar(
+        content: Text(
+          'User added successfully. Login credentials have been sent to the user\'s email.',
+        ),
         backgroundColor: AppColors.statusResolvedText,
+        duration: Duration(seconds: 4),
       ),
     );
 
     widget.onUserAdded();
   }
+
 
   @override
   Widget build(BuildContext context) {
@@ -366,8 +365,8 @@ class _AddUserScreenState extends State<AddUserScreen> {
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                const Text(
-                                  'Phone',
+                                 const Text(
+                                  'Phone *',
                                   style: TextStyle(
                                     fontSize: 13,
                                     fontWeight: FontWeight.w600,
@@ -381,7 +380,14 @@ class _AddUserScreenState extends State<AddUserScreen> {
                                   decoration: const InputDecoration(
                                     hintText: 'e.g. +91 98765 43210',
                                   ),
+                                  validator: (value) {
+                                    if (value == null || value.trim().isEmpty) {
+                                      return 'Phone number is required';
+                                    }
+                                    return null;
+                                  },
                                 ),
+
                               ],
                             ),
                           ),

@@ -1,0 +1,9 @@
+# Firebase emulator data
+campus_connect_admin/emulator-data/
+
+# Local AI/development tool files
+campus_connect_admin/.agents/
+campus_connect_admin/.claude/
+# Local AI/development tool files
+backend/.agents/
+backend/.claude/

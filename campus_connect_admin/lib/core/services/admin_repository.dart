@@ -3,6 +3,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
 
 import '../models/models.dart';
+import 'package:cloud_functions/cloud_functions.dart';
 
 /// Central state management and repository for the CampusConnect Admin portal.
 ///
@@ -14,6 +15,9 @@ import '../models/models.dart';
 class AdminRepository extends ChangeNotifier {
   final FirebaseAuth _auth = FirebaseAuth.instance;
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+  final FirebaseFunctions _functions = FirebaseFunctions.instanceFor(
+    region: 'us-central1',
+  );
 
   // ============================================================
   // AUTHENTICATION STATE
@@ -419,10 +423,53 @@ class AdminRepository extends ChangeNotifier {
     );
   }
 
-  void addUser(UserModel user) {
-    _users.insert(0, user);
-    notifyListeners();
+  /// Calls the [createUser] Cloud Function to create a new college member.
+  ///
+  /// Returns `null` when the user is created successfully.
+  /// Returns a user-facing error message string on failure.
+  Future<String?> addUser(UserModel user) async {
+    try {
+      final callable = _functions.httpsCallable('createUser');
+
+      await callable.call({
+        'memberCode': user.memberCode,
+        'name': user.name,
+        'email': user.email,
+        'role': user.role,
+        'department': user.department,
+        'phone': user.phone,
+      });
+
+      // Reflect the new user in the local Admin UI immediately.
+      _users.insert(0, user);
+      notifyListeners();
+
+      return null;
+    } on FirebaseFunctionsException catch (e) {
+      // Map backend error codes to user-facing messages.
+      final code = (e.details is Map ? e.details['code'] : null) as String?;
+
+      switch (code) {
+        case 'EMAIL_ALREADY_EXISTS':
+          return 'Sorry, an account with this email already exists.';
+        case 'MEMBER_CODE_ALREADY_EXISTS':
+          return 'Sorry, this member code is already registered.';
+        case 'EMAIL_SEND_FAILED':
+          return 'User could not be added because the welcome email could not be sent.';
+        case 'UNAUTHORIZED':
+        case 'FORBIDDEN':
+          return 'You are not authorized to add users.';
+        case 'INVALID_DATA':
+          // Prefer the backend validation message, fall back to generic.
+          return e.message ?? 'Some fields are invalid. Please check your input.';
+        default:
+          return e.message ?? 'Unable to add user. Please try again.';
+      }
+    } catch (_) {
+      return 'Unable to add user. Please try again.';
+    }
   }
+
 
   List<UserModel> searchUsers(String query) {
     if (query.trim().isEmpty) {
