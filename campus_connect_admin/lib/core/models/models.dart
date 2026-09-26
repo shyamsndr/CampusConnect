@@ -1,4 +1,5 @@
 // Data models for CampusConnect Admin
+import 'package:cloud_firestore/cloud_firestore.dart';
 
 class UserModel {
   final String memberCode;
@@ -20,6 +21,32 @@ class UserModel {
     required this.status,
     required this.createdAt,
   });
+
+  /// Creates a [UserModel] from a Firestore document snapshot.
+  ///
+  /// Firestore field names use snake_case (member_code, created_at).
+  /// All fields are safely handled with null-fallback defaults.
+  factory UserModel.fromFirestore(DocumentSnapshot doc) {
+    final data = doc.data() as Map<String, dynamic>? ?? {};
+
+    // Convert Firestore Timestamp -> DateTime, fallback to epoch if missing.
+    DateTime createdAt = DateTime(2000);
+    final rawCreatedAt = data['created_at'];
+    if (rawCreatedAt is Timestamp) {
+      createdAt = rawCreatedAt.toDate();
+    }
+
+    return UserModel(
+      memberCode: (data['member_code'] as String?)?.trim() ?? '',
+      name: (data['name'] as String?)?.trim() ?? '',
+      email: (data['email'] as String?)?.trim() ?? '',
+      role: (data['role'] as String?)?.trim() ?? 'Unknown',
+      department: (data['department'] as String?)?.trim() ?? '',
+      phone: (data['phone'] as String?)?.trim() ?? '-',
+      status: (data['status'] as String?)?.trim() ?? 'Unknown',
+      createdAt: createdAt,
+    );
+  }
 
   UserModel copyWith({
     String? memberCode,

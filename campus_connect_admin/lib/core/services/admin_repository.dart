@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
@@ -11,7 +13,8 @@ import 'package:cloud_functions/cloud_functions.dart';
 /// - Firebase Authentication
 /// - Admin authorization using Firestore
 /// - Admin session restoration after browser refresh
-/// - In-memory users, complaints, and events data
+/// - Realtime Firestore listener for USERS collection
+/// - In-memory complaints and events data
 class AdminRepository extends ChangeNotifier {
   final FirebaseAuth _auth = FirebaseAuth.instance;
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
@@ -86,6 +89,9 @@ class AdminRepository extends ChangeNotifier {
       _adminRole = data['role']?.toString() ?? 'Admin';
 
       _isAuthenticated = true;
+
+      // Start listening to USERS collection once admin session is confirmed.
+      subscribeToUsers();
     } catch (_) {
       // If session restoration fails, keep the user logged out.
       _isAuthenticated = false;
@@ -143,6 +149,9 @@ class AdminRepository extends ChangeNotifier {
 
       notifyListeners();
 
+      // Start listening to USERS collection once admin is authenticated.
+      subscribeToUsers();
+
       return null;
     } on FirebaseAuthException catch (e) {
       switch (e.code) {
@@ -176,6 +185,7 @@ class AdminRepository extends ChangeNotifier {
   /// Signs the administrator out from Firebase Authentication
   /// and clears the local admin session.
   Future<void> logout() async {
+    _cancelUsersSubscription();
     await _auth.signOut();
 
     _isAuthenticated = false;
@@ -183,75 +193,84 @@ class AdminRepository extends ChangeNotifier {
     _adminEmail = '';
     _adminRole = '';
 
+    // Clear user state on logout.
+    _users.clear();
+    _isLoadingUsers = false;
+    _usersError = null;
+
     notifyListeners();
   }
 
   // ============================================================
-  // INITIAL REALISTIC COLLEGE USERS
+  // USERS — FIRESTORE REALTIME STATE
   // ============================================================
 
-  final List<UserModel> _users = [
-    UserModel(
-      memberCode: 'ADM-001',
-      name: 'Dr. Rajesh Sharma',
-      email: 'admin@campusconnect.edu',
-      role: 'Admin',
-      department: 'Administration',
-      phone: '+91 98765 43210',
-      status: 'Active',
-      createdAt: DateTime(2026, 1, 10),
-    ),
-    UserModel(
-      memberCode: 'STU-2024-042',
-      name: 'Aarav Patel',
-      email: 'aarav.p@student.college.edu',
-      role: 'Student',
-      department: 'Computer Science',
-      phone: '+91 98112 34567',
-      status: 'Active',
-      createdAt: DateTime(2026, 2, 14),
-    ),
-    UserModel(
-      memberCode: 'STF-108',
-      name: 'Prof. Ananya Sen',
-      email: 'ananya.sen@college.edu',
-      role: 'Staff',
-      department: 'Electronics & Comm.',
-      phone: '+91 98223 45678',
-      status: 'Active',
-      createdAt: DateTime(2026, 2, 18),
-    ),
-    UserModel(
-      memberCode: 'STU-2024-089',
-      name: 'Priya Sundaram',
-      email: 'priya.s@student.college.edu',
-      role: 'Student',
-      department: 'Information Tech',
-      phone: '+91 98334 56789',
-      status: 'Active',
-      createdAt: DateTime(2026, 3, 1),
-    ),
-    UserModel(
-      memberCode: 'STF-214',
-      name: 'Dr. Vikram Joshi',
-      email: 'v.joshi@college.edu',
-      role: 'Staff',
-      department: 'Mechanical Engg',
-      phone: '+91 98445 67890',
-      status: 'Active',
-      createdAt: DateTime(2026, 3, 5),
-    ),
-    UserModel(
-      memberCode: 'STU-2024-115',
-      name: 'Rohan Mehra',
-      email: 'rohan.m@student.college.edu',
-      role: 'Student',
-      department: 'Civil Engineering',
-      phone: '+91 98556 78901',
-      status: 'Active',
-      createdAt: DateTime(2026, 3, 8),
-    ),
-  ];
+  final List<UserModel> _users = [];
+  bool _isLoadingUsers = false;
+  String? _usersError;
+
+  /// Active Firestore snapshot subscription for the USERS collection.
+  /// Cancelled when the admin logs out or the repository is disposed.
+  StreamSubscription<QuerySnapshot<Map<String, dynamic>>>? _usersSubscription;
+
+  bool get isLoadingUsers => _isLoadingUsers;
+  String? get usersError => _usersError;
+
+  /// Starts (or restarts) a realtime Firestore listener on the USERS collection.
+  ///
+  /// - Orders results by [created_at] descending (newest first).
+  /// - Converts each document via [UserModel.fromFirestore].
+  /// - Skips malformed documents without crashing.
+  /// - Cancels any previously active subscription first to avoid duplicates.
+  void subscribeToUsers() {
+    // Cancel any previous subscription before creating a new one.
+    _cancelUsersSubscription();
+
+    _isLoadingUsers = true;
+    _usersError = null;
+    notifyListeners();
+
+    _usersSubscription = _firestore
+        .collection('USERS')
+        .orderBy('created_at', descending: true)
+        .snapshots()
+        .listen(
+          (snapshot) {
+            final loaded = <UserModel>[];
+
+            for (final doc in snapshot.docs) {
+              try {
+                loaded.add(UserModel.fromFirestore(doc));
+              } catch (e) {
+                // Skip individual malformed documents — do not crash the page.
+                debugPrint('[AdminRepository] Skipped malformed USERS doc '
+                    '${doc.id}: $e');
+              }
+            }
+
+            _users
+              ..clear()
+              ..addAll(loaded);
+
+            _isLoadingUsers = false;
+            _usersError = null;
+            notifyListeners();
+          },
+          onError: (Object error) {
+            debugPrint('[AdminRepository] USERS snapshot error: $error');
+            _isLoadingUsers = false;
+            _usersError =
+                'Unable to load members. Please check your connection.';
+            notifyListeners();
+          },
+        );
+  }
+
+  /// Cancels the active USERS Firestore subscription.
+  void _cancelUsersSubscription() {
+    _usersSubscription?.cancel();
+    _usersSubscription = null;
+  }
 
   // ============================================================
   // INITIAL REALISTIC CAMPUS COMPLAINTS
@@ -375,6 +394,12 @@ class AdminRepository extends ChangeNotifier {
 
   List<UserModel> get users => List.unmodifiable(_users);
 
+  @override
+  void dispose() {
+    _cancelUsersSubscription();
+    super.dispose();
+  }
+
   List<ComplaintModel> get complaints => List.unmodifiable(_complaints);
 
   List<EventModel> get events => List.unmodifiable(_events);
@@ -401,6 +426,8 @@ class AdminRepository extends ChangeNotifier {
   }
 
   List<UserModel> get recentUsers {
+    if (_users.isEmpty) return [];
+
     final sorted = List<UserModel>.from(_users)
       ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
 
@@ -427,6 +454,10 @@ class AdminRepository extends ChangeNotifier {
   ///
   /// Returns `null` when the user is created successfully.
   /// Returns a user-facing error message string on failure.
+  ///
+  /// Note: the Firestore USERS snapshot listener automatically picks up
+  /// the new document written by the Cloud Function — no manual list
+  /// insertion is needed.
   Future<String?> addUser(UserModel user) async {
     try {
       final callable = _functions.httpsCallable('createUser');
@@ -440,9 +471,8 @@ class AdminRepository extends ChangeNotifier {
         'phone': user.phone,
       });
 
-      // Reflect the new user in the local Admin UI immediately.
-      _users.insert(0, user);
-      notifyListeners();
+      // No manual list insertion: the Firestore snapshot listener
+      // will receive the new USERS document and update the UI automatically.
 
       return null;
     } on FirebaseFunctionsException catch (e) {
@@ -483,7 +513,8 @@ class AdminRepository extends ChangeNotifier {
           user.memberCode.toLowerCase().contains(q) ||
           user.email.toLowerCase().contains(q) ||
           user.department.toLowerCase().contains(q) ||
-          user.role.toLowerCase().contains(q);
+          user.role.toLowerCase().contains(q) ||
+          user.phone.toLowerCase().contains(q);
     }).toList();
   }
 
