@@ -1,12 +1,15 @@
 import 'package:flutter/material.dart';
 
 import '../../core/constants/app_colors.dart';
+import '../../core/services/auth_service.dart';
 import '../../widgets/auth/auth_button.dart';
 import '../../widgets/auth/auth_text_field.dart';
 import '../main/main_screen.dart';
 
 class LoginScreen extends StatefulWidget {
-  const LoginScreen({super.key});
+  final AuthService authService;
+
+  const LoginScreen({super.key, required this.authService});
 
   @override
   State<LoginScreen> createState() => _LoginScreenState();
@@ -14,22 +17,27 @@ class LoginScreen extends StatefulWidget {
 
 class _LoginScreenState extends State<LoginScreen> {
   final _formKey = GlobalKey<FormState>();
+  final _identifierController = TextEditingController();
+  final _passwordController = TextEditingController();
 
   bool _obscurePassword = true;
+  bool _isLoading = false;
 
-  String? _validateEmail(String? value) {
+  @override
+  void dispose() {
+    _identifierController.dispose();
+    _passwordController.dispose();
+    super.dispose();
+  }
+
+  // ============================================================
+  // VALIDATION
+  // ============================================================
+
+  String? _validateIdentifier(String? value) {
     if (value == null || value.trim().isEmpty) {
-      return 'Username is required';
+      return 'Email or member code is required';
     }
-
-    final email = value.trim();
-
-    final emailRegex = RegExp(r'^[\w\.-]+@[\w\.-]+\.\w+$');
-
-    if (!emailRegex.hasMatch(email)) {
-      return 'Enter a valid email address';
-    }
-
     return null;
   }
 
@@ -37,26 +45,51 @@ class _LoginScreenState extends State<LoginScreen> {
     if (value == null || value.isEmpty) {
       return 'Password is required';
     }
-
-    if (value.length < 6) {
-      return 'Password must be at least 6 characters';
-    }
-
     return null;
   }
 
-  void _handleLogin() {
-    final isValid = _formKey.currentState!.validate();
+  // ============================================================
+  // LOGIN
+  // ============================================================
 
-    if (!isValid) {
+  Future<void> _handleLogin() async {
+    final isValid = _formKey.currentState!.validate();
+    if (!isValid) return;
+
+    setState(() => _isLoading = true);
+
+    final error = await widget.authService.login(
+      _identifierController.text,
+      _passwordController.text,
+    );
+
+    if (!mounted) return;
+
+    setState(() => _isLoading = false);
+
+    if (error != null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(error),
+          backgroundColor: Colors.redAccent,
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
       return;
     }
 
+    // Login successful — navigate to MainScreen and clear the back stack.
     Navigator.pushReplacement(
       context,
-      MaterialPageRoute(builder: (_) => const MainScreen()),
+      MaterialPageRoute(
+        builder: (_) => MainScreen(authService: widget.authService),
+      ),
     );
   }
+
+  // ============================================================
+  // BUILD
+  // ============================================================
 
   @override
   Widget build(BuildContext context) {
@@ -139,19 +172,23 @@ class _LoginScreenState extends State<LoginScreen> {
 
                       const SizedBox(height: 42),
 
+                      // Field 1: Email or Member Code
                       AuthTextField(
-                        label: 'Username',
-                        hint: 'example@email.com',
+                        label: 'Email or Member Code',
+                        hint: 'example@email.com or MCA001',
                         keyboardType: TextInputType.emailAddress,
-                        validator: _validateEmail,
+                        controller: _identifierController,
+                        validator: _validateIdentifier,
                       ),
 
                       const SizedBox(height: 28),
 
+                      // Field 2: Password
                       AuthTextField(
                         label: 'Password',
                         hint: '••••••••',
                         obscureText: _obscurePassword,
+                        controller: _passwordController,
                         validator: _validatePassword,
                         suffixIcon: IconButton(
                           onPressed: () {
@@ -175,7 +212,7 @@ class _LoginScreenState extends State<LoginScreen> {
                         alignment: Alignment.centerRight,
                         child: TextButton(
                           onPressed: () {
-                            // Forgot password later.
+                            // Forgot password — future feature.
                           },
                           style: TextButton.styleFrom(
                             padding: EdgeInsets.zero,
@@ -195,7 +232,9 @@ class _LoginScreenState extends State<LoginScreen> {
 
                       const SizedBox(height: 28),
 
-                      AuthButton(text: 'LOGIN', onPressed: _handleLogin),
+                      _isLoading
+                          ? const Center(child: CircularProgressIndicator())
+                          : AuthButton(text: 'LOGIN', onPressed: _handleLogin),
                     ],
                   ),
                 ),

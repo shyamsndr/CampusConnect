@@ -1,9 +1,12 @@
 import 'package:flutter/material.dart';
 import '../../core/constants/app_colors.dart';
+import '../../core/services/auth_service.dart';
 import '../complaints/report_issue_screen.dart';
 
 class HomeScreen extends StatefulWidget {
-  const HomeScreen({super.key});
+  final AuthService authService;
+
+  const HomeScreen({super.key, required this.authService});
 
   @override
   State<HomeScreen> createState() => _HomeScreenState();
@@ -35,6 +38,25 @@ class _HomeScreenState extends State<HomeScreen> {
   void dispose() {
     _scrollController.dispose();
     super.dispose();
+  }
+
+  // ============================================================
+  // DYNAMIC GREETING
+  // ============================================================
+
+  /// Returns a time-appropriate greeting based on the device's local time.
+  ///
+  /// 05:00 – 11:59 → Good Morning
+  /// 12:00 – 16:59 → Good Afternoon
+  /// 17:00 – 20:59 → Good Evening
+  /// 21:00 – 04:59 → Good Night
+  String _getGreeting() {
+    final hour = DateTime.now().hour;
+
+    if (hour >= 5 && hour < 12) return 'Good Morning';
+    if (hour >= 12 && hour < 17) return 'Good Afternoon';
+    if (hour >= 17 && hour < 21) return 'Good Evening';
+    return 'Good Night';
   }
 
   @override
@@ -115,6 +137,9 @@ class _HomeScreenState extends State<HomeScreen> {
   // ===============================================================
 
   Widget _buildBlueHeader() {
+    final greeting = _getGreeting();
+    final userName = widget.authService.currentUser?.name ?? '';
+
     return Container(
       decoration: const BoxDecoration(
         gradient: LinearGradient(
@@ -157,21 +182,21 @@ class _HomeScreenState extends State<HomeScreen> {
             ),
           ),
 
-          // Greeting
-          const Positioned(
+          // Dynamic greeting and user name from Firestore
+          Positioned(
             top: 34,
             left: 26,
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  'Good Morning 👋',
-                  style: TextStyle(color: Colors.white, fontSize: 15),
+                  '$greeting 👋',
+                  style: const TextStyle(color: Colors.white, fontSize: 15),
                 ),
-                SizedBox(height: 3),
+                const SizedBox(height: 3),
                 Text(
-                  'Shyam',
-                  style: TextStyle(
+                  userName,
+                  style: const TextStyle(
                     color: Colors.white,
                     fontSize: 28,
                     fontWeight: FontWeight.bold,
@@ -269,7 +294,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   Navigator.push(
                     context,
                     MaterialPageRoute(
-                      builder: (context) => const ReportIssueScreen(),
+                      builder: (context) => ReportIssueScreen(authService: widget.authService),
                     ),
                   );
                 },

@@ -4,10 +4,13 @@ import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 
 import '../../core/constants/app_colors.dart';
+import '../../core/services/auth_service.dart';
 import 'complaint_success_screen.dart';
 
 class ReportIssueScreen extends StatefulWidget {
-  const ReportIssueScreen({super.key});
+  final AuthService authService;
+
+  const ReportIssueScreen({super.key, required this.authService});
 
   @override
   State<ReportIssueScreen> createState() => _ReportIssueScreenState();
@@ -116,7 +119,9 @@ class _ReportIssueScreenState extends State<ReportIssueScreen> {
 
       Navigator.pushReplacement(
         context,
-        MaterialPageRoute(builder: (_) => const ComplaintSuccessScreen()),
+        MaterialPageRoute(
+          builder: (_) => ComplaintSuccessScreen(authService: widget.authService),
+        ),
       );
     });
   }

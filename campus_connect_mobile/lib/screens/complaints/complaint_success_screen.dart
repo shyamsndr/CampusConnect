@@ -1,10 +1,13 @@
 import 'package:flutter/material.dart';
 
 import '../../core/constants/app_colors.dart';
+import '../../core/services/auth_service.dart';
 import '../main/main_screen.dart';
 
 class ComplaintSuccessScreen extends StatefulWidget {
-  const ComplaintSuccessScreen({super.key});
+  final AuthService authService;
+
+  const ComplaintSuccessScreen({super.key, required this.authService});
 
   @override
   State<ComplaintSuccessScreen> createState() => _ComplaintSuccessScreenState();
@@ -41,7 +44,12 @@ class _ComplaintSuccessScreenState extends State<ComplaintSuccessScreen>
   void _goHome() {
     Navigator.pushAndRemoveUntil(
       context,
-      MaterialPageRoute(builder: (_) => const MainScreen(initialIndex: 0)),
+      MaterialPageRoute(
+        builder: (_) => MainScreen(
+          authService: widget.authService,
+          initialIndex: 0,
+        ),
+      ),
       (route) => false,
     );
   }
@@ -49,7 +57,12 @@ class _ComplaintSuccessScreenState extends State<ComplaintSuccessScreen>
   void _viewComplaints() {
     Navigator.pushAndRemoveUntil(
       context,
-      MaterialPageRoute(builder: (_) => const MainScreen(initialIndex: 1)),
+      MaterialPageRoute(
+        builder: (_) => MainScreen(
+          authService: widget.authService,
+          initialIndex: 1,
+        ),
+      ),
       (route) => false,
     );
   }
