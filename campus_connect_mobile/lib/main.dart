@@ -1,6 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_core/firebase_core.dart';
+import 'package:firebase_storage/firebase_storage.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
@@ -33,13 +34,18 @@ Future<void> main() async {
 
     FirebaseFirestore.instance.useFirestoreEmulator(host, 8080);
     await FirebaseAuth.instance.useAuthEmulator(host, 9099);
+    await FirebaseStorage.instance.useStorageEmulator(host, 9199);
 
     debugPrint('[Firebase] Emulator host: $host');
-    debugPrint('[Firebase] Connected to local Emulators '
-        '(Auth: $host:9099, Firestore: $host:8080)');
+    debugPrint(
+      '[Firebase] Connected to local Emulators '
+      '(Auth: $host:9099, Firestore: $host:8080, Storage: $host:9199)',
+    );
   } else {
-    debugPrint('[Firebase] Connected to Production Firebase '
-        '(${DefaultFirebaseOptions.currentPlatform.projectId})');
+    debugPrint(
+      '[Firebase] Connected to Production Firebase '
+      '(${DefaultFirebaseOptions.currentPlatform.projectId})',
+    );
   }
 
   runApp(const CampusConnectApp());

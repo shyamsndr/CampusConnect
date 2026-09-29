@@ -29,12 +29,14 @@ class _AdminLayoutState extends State<AdminLayout> {
   AdminNavDestination _currentDestination = AdminNavDestination.dashboard;
   ComplaintModel? _selectedComplaint;
   bool _isAddingEvent = false;
+  EventModel? _eventToEdit;
 
   void _onSelectDestination(AdminNavDestination destination) {
     setState(() {
       _currentDestination = destination;
       _selectedComplaint = null;
       _isAddingEvent = false;
+      _eventToEdit = null;
     });
     // Close drawer if open on mobile
     if (_scaffoldKey.currentState?.isDrawerOpen ?? false) {
@@ -47,6 +49,7 @@ class _AdminLayoutState extends State<AdminLayout> {
       _currentDestination = AdminNavDestination.complaints;
       _selectedComplaint = complaint;
       _isAddingEvent = false;
+      _eventToEdit = null;
     });
   }
 
@@ -55,7 +58,7 @@ class _AdminLayoutState extends State<AdminLayout> {
       return 'Complaint Details';
     }
     if (_isAddingEvent) {
-      return 'Add Campus Event';
+      return _eventToEdit != null ? 'Edit Campus Event' : 'Add Campus Event';
     }
 
     switch (_currentDestination) {
@@ -79,7 +82,9 @@ class _AdminLayoutState extends State<AdminLayout> {
       return 'Complaint #${_selectedComplaint!.id}';
     }
     if (_isAddingEvent) {
-      return 'Schedule a new event';
+      return _eventToEdit != null
+          ? 'Update event details & poster'
+          : 'Schedule a new event';
     }
 
     switch (_currentDestination) {
@@ -114,14 +119,17 @@ class _AdminLayoutState extends State<AdminLayout> {
     if (_isAddingEvent) {
       return AddEventScreen(
         repository: widget.repository,
+        eventToEdit: _eventToEdit,
         onEventAdded: () {
           setState(() {
             _isAddingEvent = false;
+            _eventToEdit = null;
           });
         },
         onCancel: () {
           setState(() {
             _isAddingEvent = false;
+            _eventToEdit = null;
           });
         },
       );
@@ -137,16 +145,13 @@ class _AdminLayoutState extends State<AdminLayout> {
       case AdminNavDestination.users:
         return UsersScreen(
           repository: widget.repository,
-          onAddUser: () =>
-              _onSelectDestination(AdminNavDestination.addUser),
+          onAddUser: () => _onSelectDestination(AdminNavDestination.addUser),
         );
       case AdminNavDestination.addUser:
         return AddUserScreen(
           repository: widget.repository,
-          onUserAdded: () =>
-              _onSelectDestination(AdminNavDestination.users),
-          onCancel: () =>
-              _onSelectDestination(AdminNavDestination.users),
+          onUserAdded: () => _onSelectDestination(AdminNavDestination.users),
+          onCancel: () => _onSelectDestination(AdminNavDestination.users),
         );
       case AdminNavDestination.complaints:
         return ComplaintsScreen(
@@ -159,6 +164,13 @@ class _AdminLayoutState extends State<AdminLayout> {
           onAddEvent: () {
             setState(() {
               _isAddingEvent = true;
+              _eventToEdit = null;
+            });
+          },
+          onEditEvent: (event) {
+            setState(() {
+              _isAddingEvent = true;
+              _eventToEdit = event;
             });
           },
         );
@@ -212,9 +224,7 @@ class _AdminLayoutState extends State<AdminLayout> {
                       onProfilePressed: () =>
                           _onSelectDestination(AdminNavDestination.profile),
                     ),
-                    Expanded(
-                      child: _buildContent(),
-                    ),
+                    Expanded(child: _buildContent()),
                   ],
                 ),
               ),

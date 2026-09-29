@@ -7,6 +7,8 @@ import 'package:flutter/foundation.dart';
 import '../models/models.dart';
 import 'package:cloud_functions/cloud_functions.dart';
 
+import 'package:firebase_storage/firebase_storage.dart';
+
 /// Central state management and repository for the CampusConnect Admin portal.
 ///
 /// Handles:
@@ -14,10 +16,12 @@ import 'package:cloud_functions/cloud_functions.dart';
 /// - Admin authorization using Firestore
 /// - Admin session restoration after browser refresh
 /// - Realtime Firestore listener for USERS collection
-/// - In-memory complaints and events data
+/// - Realtime Firestore listener for EVENTS collection
+/// - In-memory complaints data
 class AdminRepository extends ChangeNotifier {
   final FirebaseAuth _auth = FirebaseAuth.instance;
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+  final FirebaseStorage _storage = FirebaseStorage.instance;
   final FirebaseFunctions _functions = FirebaseFunctions.instanceFor(
     region: 'us-central1',
   );
@@ -90,8 +94,9 @@ class AdminRepository extends ChangeNotifier {
 
       _isAuthenticated = true;
 
-      // Start listening to USERS collection once admin session is confirmed.
+      // Start listening to USERS & EVENTS collections once admin session is confirmed.
       subscribeToUsers();
+      subscribeToEvents();
     } catch (_) {
       // If session restoration fails, keep the user logged out.
       _isAuthenticated = false;
@@ -149,8 +154,9 @@ class AdminRepository extends ChangeNotifier {
 
       notifyListeners();
 
-      // Start listening to USERS collection once admin is authenticated.
+      // Start listening to USERS & EVENTS collections once admin is authenticated.
       subscribeToUsers();
+      subscribeToEvents();
 
       return null;
     } on FirebaseAuthException catch (e) {
@@ -186,6 +192,7 @@ class AdminRepository extends ChangeNotifier {
   /// and clears the local admin session.
   Future<void> logout() async {
     _cancelUsersSubscription();
+    _cancelEventsSubscription();
     await _auth.signOut();
 
     _isAuthenticated = false;
@@ -193,8 +200,9 @@ class AdminRepository extends ChangeNotifier {
     _adminEmail = '';
     _adminRole = '';
 
-    // Clear user state on logout.
+    // Clear user and event state on logout.
     _users.clear();
+    _events.clear();
     _isLoadingUsers = false;
     _usersError = null;
 
@@ -217,13 +225,7 @@ class AdminRepository extends ChangeNotifier {
   String? get usersError => _usersError;
 
   /// Starts (or restarts) a realtime Firestore listener on the USERS collection.
-  ///
-  /// - Orders results by [created_at] descending (newest first).
-  /// - Converts each document via [UserModel.fromFirestore].
-  /// - Skips malformed documents without crashing.
-  /// - Cancels any previously active subscription first to avoid duplicates.
   void subscribeToUsers() {
-    // Cancel any previous subscription before creating a new one.
     _cancelUsersSubscription();
 
     _isLoadingUsers = true;
@@ -242,9 +244,9 @@ class AdminRepository extends ChangeNotifier {
               try {
                 loaded.add(UserModel.fromFirestore(doc));
               } catch (e) {
-                // Skip individual malformed documents — do not crash the page.
-                debugPrint('[AdminRepository] Skipped malformed USERS doc '
-                    '${doc.id}: $e');
+                debugPrint(
+                  '[AdminRepository] Skipped malformed USERS doc ${doc.id}: $e',
+                );
               }
             }
 
@@ -352,64 +354,14 @@ class AdminRepository extends ChangeNotifier {
   ];
 
   // ============================================================
-  // INITIAL REALISTIC CAMPUS EVENTS
-  // ============================================================
-
-  final List<EventModel> _events = [
-    EventModel(
-      id: 'EVT-2026-01',
-      title: 'Annual Technical Symposium: InnovateX 2026',
-      description:
-          'Inter-college hackathon, paper presentation, and robotics exhibition for engineering students.',
-      date: DateTime(2026, 9, 25),
-      time: '09:00 AM - 05:00 PM',
-      venue: 'Main Auditorium & CS Labs',
-      status: 'Published',
-    ),
-    EventModel(
-      id: 'EVT-2026-02',
-      title: 'Campus Placement Readiness & Mock Interviews',
-      description:
-          'Alumni-led interview preparation, resume building, and technical assessment workshop for final-year students.',
-      date: DateTime(2026, 9, 28),
-      time: '10:00 AM - 01:00 PM',
-      venue: 'Placement Cell & Seminar Hall A',
-      status: 'Published',
-    ),
-    EventModel(
-      id: 'EVT-2026-03',
-      title: 'Inter-Department Cricket Tournament',
-      description:
-          'Annual sports league matches between student batches and faculty teams.',
-      date: DateTime(2026, 10, 5),
-      time: '08:00 AM - 04:00 PM',
-      venue: 'College Sports Ground',
-      status: 'Draft',
-    ),
-  ];
-
-  // ============================================================
-  // GETTERS
+  // GETTERS & DASHBOARD METRICS
   // ============================================================
 
   List<UserModel> get users => List.unmodifiable(_users);
-
-  @override
-  void dispose() {
-    _cancelUsersSubscription();
-    super.dispose();
-  }
-
   List<ComplaintModel> get complaints => List.unmodifiable(_complaints);
-
   List<EventModel> get events => List.unmodifiable(_events);
 
-  // ============================================================
-  // DASHBOARD METRICS
-  // ============================================================
-
   int get totalUsers => _users.length;
-
   int get totalComplaints => _complaints.length;
 
   int get pendingComplaints =>
@@ -450,14 +402,6 @@ class AdminRepository extends ChangeNotifier {
     );
   }
 
-  /// Calls the [createUser] Cloud Function to create a new college member.
-  ///
-  /// Returns `null` when the user is created successfully.
-  /// Returns a user-facing error message string on failure.
-  ///
-  /// Note: the Firestore USERS snapshot listener automatically picks up
-  /// the new document written by the Cloud Function — no manual list
-  /// insertion is needed.
   Future<String?> addUser(UserModel user) async {
     try {
       final callable = _functions.httpsCallable('createUser');
@@ -471,12 +415,8 @@ class AdminRepository extends ChangeNotifier {
         'phone': user.phone,
       });
 
-      // No manual list insertion: the Firestore snapshot listener
-      // will receive the new USERS document and update the UI automatically.
-
       return null;
     } on FirebaseFunctionsException catch (e) {
-      // Map backend error codes to user-facing messages.
       final code = (e.details is Map ? e.details['code'] : null) as String?;
 
       switch (code) {
@@ -490,8 +430,8 @@ class AdminRepository extends ChangeNotifier {
         case 'FORBIDDEN':
           return 'You are not authorized to add users.';
         case 'INVALID_DATA':
-          // Prefer the backend validation message, fall back to generic.
-          return e.message ?? 'Some fields are invalid. Please check your input.';
+          return e.message ??
+              'Some fields are invalid. Please check your input.';
         default:
           return e.message ?? 'Unable to add user. Please try again.';
       }
@@ -499,7 +439,6 @@ class AdminRepository extends ChangeNotifier {
       return 'Unable to add user. Please try again.';
     }
   }
-
 
   List<UserModel> searchUsers(String query) {
     if (query.trim().isEmpty) {
@@ -541,35 +480,203 @@ class AdminRepository extends ChangeNotifier {
   }
 
   // ============================================================
-  // EVENT ACTIONS
+  // EVENTS — FIRESTORE REALTIME STATE
   // ============================================================
 
-  void addEvent(EventModel event) {
-    _events.insert(0, event);
+  final List<EventModel> _events = [];
+  bool _isLoadingEvents = false;
+  String? _eventsError;
+
+  StreamSubscription<QuerySnapshot<Map<String, dynamic>>>? _eventsSubscription;
+
+  bool get isLoadingEvents => _isLoadingEvents;
+  String? get eventsError => _eventsError;
+
+  /// Starts (or restarts) a realtime Firestore listener on the EVENTS collection.
+  void subscribeToEvents() {
+    _cancelEventsSubscription();
+
+    _isLoadingEvents = true;
+    _eventsError = null;
     notifyListeners();
+
+    _eventsSubscription = _firestore
+        .collection('EVENTS')
+        .orderBy('event_date', descending: false)
+        .snapshots()
+        .listen(
+          (snapshot) {
+            final loaded = <EventModel>[];
+
+            for (final doc in snapshot.docs) {
+              try {
+                loaded.add(EventModel.fromFirestore(doc));
+              } catch (e) {
+                debugPrint(
+                  '[AdminRepository] Skipped malformed EVENTS doc ${doc.id}: $e',
+                );
+              }
+            }
+
+            _events
+              ..clear()
+              ..addAll(loaded);
+
+            _isLoadingEvents = false;
+            _eventsError = null;
+            notifyListeners();
+          },
+          onError: (Object error) {
+            debugPrint('[AdminRepository] EVENTS snapshot error: $error');
+            _isLoadingEvents = false;
+            _eventsError =
+                'Unable to load events. Please check your connection.';
+            notifyListeners();
+          },
+        );
   }
 
-  void updateEventStatus(String id, String newStatus) {
-    final index = _events.indexWhere((e) => e.id == id);
+  void _cancelEventsSubscription() {
+    _eventsSubscription?.cancel();
+    _eventsSubscription = null;
+  }
 
-    if (index != -1) {
-      _events[index] = _events[index].copyWith(status: newStatus);
+  @override
+  void dispose() {
+    _cancelUsersSubscription();
+    _cancelEventsSubscription();
+    super.dispose();
+  }
 
-      notifyListeners();
+  // ============================================================
+  // EVENT ACTIONS & STORAGE UPLOAD
+  // ============================================================
+
+  /// Uploads poster bytes to Firebase Storage under `events/posters/{eventId}_{timestamp}.jpg`.
+  /// Returns the download URL.
+  Future<String> uploadPoster(Uint8List imageBytes, String filename) async {
+    debugPrint(
+      '[EventSubmit] [3/7] Poster upload started (filename: $filename, bytes: ${imageBytes.length})',
+    );
+    try {
+      final ref = _storage
+          .ref()
+          .child('events')
+          .child('posters')
+          .child('${DateTime.now().millisecondsSinceEpoch}_$filename');
+
+      final uploadTask = ref.putData(
+        imageBytes,
+        SettableMetadata(contentType: 'image/jpeg'),
+      );
+      final snapshot = await uploadTask;
+      final downloadUrl = await snapshot.ref.getDownloadURL();
+      debugPrint(
+        '[EventSubmit] [4/7] Poster upload completed successfully. Download URL: $downloadUrl',
+      );
+      return downloadUrl;
+    } catch (e, stackTrace) {
+      debugPrint(
+        '[EventSubmit] Poster upload failed with error: $e\n$stackTrace',
+      );
+      rethrow;
     }
   }
 
-  void editEvent(EventModel updatedEvent) {
-    final index = _events.indexWhere((e) => e.id == updatedEvent.id);
-
-    if (index != -1) {
-      _events[index] = updatedEvent;
-      notifyListeners();
+  /// Adds a new event to Firestore.
+  Future<String?> saveEventToFirestore(EventModel event) async {
+    debugPrint(
+      '[EventSubmit] [5/7] Firestore write started for event_id: ${event.eventId}',
+    );
+    try {
+      final docRef = _firestore.collection('EVENTS').doc(event.eventId);
+      await docRef.set(event.toFirestore());
+      debugPrint(
+        '[EventSubmit] [6/7] Firestore write completed successfully for event_id: ${event.eventId}',
+      );
+      return null;
+    } catch (e, stackTrace) {
+      debugPrint(
+        '[EventSubmit] Firestore write failed with error: $e\n$stackTrace',
+      );
+      return 'Failed to save event: ${e.toString()}';
     }
   }
 
-  void deleteEvent(String id) {
-    _events.removeWhere((e) => e.id == id);
-    notifyListeners();
+  /// Updates an existing event in Firestore.
+  Future<String?> updateEventInFirestore(EventModel event) async {
+    debugPrint(
+      '[EventSubmit] [5/7] Firestore update started for event_id: ${event.eventId}',
+    );
+    try {
+      final docRef = _firestore.collection('EVENTS').doc(event.eventId);
+      await docRef.update(event.toFirestore());
+      debugPrint(
+        '[EventSubmit] [6/7] Firestore update completed successfully for event_id: ${event.eventId}',
+      );
+      return null;
+    } catch (e, stackTrace) {
+      debugPrint(
+        '[EventSubmit] Firestore update failed with error: $e\n$stackTrace',
+      );
+      return 'Failed to update event: ${e.toString()}';
+    }
+  }
+
+  /// Deletes poster from Storage by URL safely.
+  Future<void> safeDeletePoster(String posterUrl) async {
+    if (posterUrl.isNotEmpty && posterUrl.startsWith('http')) {
+      try {
+        final storageRef = _storage.refFromURL(posterUrl);
+        await storageRef.delete();
+        debugPrint('[EventSubmit] Cleaned up orphaned poster: $posterUrl');
+      } catch (e) {
+        debugPrint(
+          '[EventSubmit] Warning: Failed to clean up poster $posterUrl: $e',
+        );
+      }
+    }
+  }
+
+  /// Updates status of an event in Firestore ('published' or 'cancelled').
+  Future<void> updateEventStatus(String id, String newStatus) async {
+    try {
+      await _firestore.collection('EVENTS').doc(id).update({
+        'status': newStatus,
+        'updated_at': Timestamp.fromDate(DateTime.now()),
+      });
+    } catch (e) {
+      debugPrint('[AdminRepository] Update status error: $e');
+      // Local fallback if offline
+      final index = _events.indexWhere((e) => e.eventId == id);
+      if (index != -1) {
+        _events[index] = _events[index].copyWith(
+          status: newStatus,
+          updatedAt: DateTime.now(),
+        );
+        notifyListeners();
+      }
+    }
+  }
+
+  /// Deletes an event document from Firestore and safely deletes poster from Storage if present.
+  Future<void> deleteEvent(String id) async {
+    try {
+      final index = _events.indexWhere((e) => e.eventId == id);
+      String? posterUrl;
+      if (index != -1) {
+        posterUrl = _events[index].posterUrl;
+      }
+
+      await _firestore.collection('EVENTS').doc(id).delete();
+
+      if (posterUrl != null) {
+        await safeDeletePoster(posterUrl);
+      }
+    } catch (e) {
+      debugPrint('[AdminRepository] Delete event error: $e');
+      _events.removeWhere((e) => e.eventId == id);
+      notifyListeners();
+    }
   }
 }

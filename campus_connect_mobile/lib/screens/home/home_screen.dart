@@ -1,7 +1,11 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import '../../core/constants/app_colors.dart';
+import '../../core/models/event_model.dart';
 import '../../core/services/auth_service.dart';
+import '../../widgets/common/event_poster_image.dart';
 import '../complaints/report_issue_screen.dart';
+import '../events/event_details_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   final AuthService authService;
@@ -294,7 +298,8 @@ class _HomeScreenState extends State<HomeScreen> {
                   Navigator.push(
                     context,
                     MaterialPageRoute(
-                      builder: (context) => ReportIssueScreen(authService: widget.authService),
+                      builder: (context) =>
+                          ReportIssueScreen(authService: widget.authService),
                     ),
                   );
                 },
@@ -326,47 +331,84 @@ class _HomeScreenState extends State<HomeScreen> {
 
         const SizedBox(height: 14),
 
-        _EventCard(
-          icon: Icons.code_rounded,
-          title: 'Tech Fest 2026',
-          date: '20 September 2026',
-          venue: 'Main Auditorium',
-        ),
+        StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+          stream: FirebaseFirestore.instance
+              .collection('EVENTS')
+              .where('status', isEqualTo: 'published')
+              .snapshots(),
+          builder: (context, snapshot) {
+            if (snapshot.connectionState == ConnectionState.waiting) {
+              return const Padding(
+                padding: EdgeInsets.symmetric(vertical: 20),
+                child: Center(
+                  child: CircularProgressIndicator(
+                    color: AppColors.primaryBlue,
+                  ),
+                ),
+              );
+            }
 
-        const SizedBox(height: 12),
+            final now = DateTime.now();
+            final todayStart = DateTime(now.year, now.month, now.day);
+            final docs = snapshot.data?.docs ?? [];
+            final events = <EventModel>[];
 
-        _EventCard(
-          icon: Icons.music_note_rounded,
-          title: 'College Arts Festival',
-          date: '25 September 2026',
-          venue: 'College Ground',
-        ),
+            for (final doc in docs) {
+              try {
+                final event = EventModel.fromFirestore(doc);
+                if (!event.eventDate.isBefore(todayStart)) {
+                  events.add(event);
+                }
+              } catch (_) {}
+            }
 
-        const SizedBox(height: 12),
+            events.sort((a, b) => a.eventDate.compareTo(b.eventDate));
 
-        _EventCard(
-          icon: Icons.sports_soccer_rounded,
-          title: 'Annual Sports Day',
-          date: '02 October 2026',
-          venue: 'Sports Ground',
-        ),
+            if (events.isEmpty) {
+              return Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(20),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFF8FAFC),
+                  borderRadius: BorderRadius.circular(14),
+                  border: Border.all(color: const Color(0xFFE0E5EA)),
+                ),
+                child: const Text(
+                  'No upcoming campus events scheduled right now.',
+                  style: TextStyle(color: AppColors.textGrey, fontSize: 13),
+                ),
+              );
+            }
 
-        const SizedBox(height: 12),
+            final topEvents = events.take(3).toList();
 
-        _EventCard(
-          icon: Icons.computer_rounded,
-          title: 'Coding Workshop',
-          date: '08 October 2026',
-          venue: 'Computer Lab',
-        ),
-
-        const SizedBox(height: 12),
-
-        _EventCard(
-          icon: Icons.work_outline_rounded,
-          title: 'Career Guidance Seminar',
-          date: '15 October 2026',
-          venue: 'Seminar Hall',
+            return Column(
+              children: topEvents.map((event) {
+                final formattedDate =
+                    '${event.eventDate.day.toString().padLeft(2, '0')}/${event.eventDate.month.toString().padLeft(2, '0')}/${event.eventDate.year}';
+                return Padding(
+                  padding: const EdgeInsets.only(bottom: 12),
+                  child: GestureDetector(
+                    onTap: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => EventDetailsScreen(event: event),
+                        ),
+                      );
+                    },
+                    child: _EventCard(
+                      icon: Icons.event,
+                      posterUrl: event.posterUrl,
+                      title: event.title,
+                      date: formattedDate,
+                      venue: event.venue,
+                    ),
+                  ),
+                );
+              }).toList(),
+            );
+          },
         ),
 
         const SizedBox(height: 40),
@@ -447,12 +489,14 @@ class _QuickActionCard extends StatelessWidget {
 
 class _EventCard extends StatelessWidget {
   final IconData icon;
+  final String? posterUrl;
   final String title;
   final String date;
   final String venue;
 
   const _EventCard({
     required this.icon,
+    this.posterUrl,
     required this.title,
     required this.date,
     required this.venue,
@@ -472,13 +516,21 @@ class _EventCard extends StatelessWidget {
       child: Row(
         children: [
           Container(
-            width: 40,
-            height: 40,
+            width: 44,
+            height: 44,
             decoration: BoxDecoration(
               color: AppColors.primaryBlue.withValues(alpha: 0.12),
               borderRadius: BorderRadius.circular(12),
             ),
-            child: Icon(icon, color: AppColors.primaryBlue, size: 21),
+            child: EventPosterImage(
+              posterUrl: posterUrl,
+              width: 44,
+              height: 44,
+              fit: BoxFit.cover,
+              borderRadius: BorderRadius.circular(11),
+              iconSize: 21,
+              backgroundColor: Colors.transparent,
+            ),
           ),
 
           const SizedBox(width: 13),
