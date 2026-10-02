@@ -583,7 +583,8 @@ class AdminRepository extends ChangeNotifier {
     }
   }
 
-  /// Adds a new event to Firestore.
+  /// Adds a new event to Firestore and creates in-app notifications for
+  /// all Student and Staff users.
   Future<String?> saveEventToFirestore(EventModel event) async {
     debugPrint(
       '[EventSubmit] [5/7] Firestore write started for event_id: ${event.eventId}',
@@ -594,6 +595,12 @@ class AdminRepository extends ChangeNotifier {
       debugPrint(
         '[EventSubmit] [6/7] Firestore write completed successfully for event_id: ${event.eventId}',
       );
+      // Create in-app notifications for all Student / Staff users.
+      await _createEventNotifications(
+        eventId: event.eventId,
+        eventTitle: event.title,
+        type: 'event_created',
+      );
       return null;
     } catch (e, stackTrace) {
       debugPrint(
@@ -603,7 +610,8 @@ class AdminRepository extends ChangeNotifier {
     }
   }
 
-  /// Updates an existing event in Firestore.
+  /// Updates an existing event in Firestore and creates in-app notifications
+  /// for all Student and Staff users.
   Future<String?> updateEventInFirestore(EventModel event) async {
     debugPrint(
       '[EventSubmit] [5/7] Firestore update started for event_id: ${event.eventId}',
@@ -613,6 +621,12 @@ class AdminRepository extends ChangeNotifier {
       await docRef.update(event.toFirestore());
       debugPrint(
         '[EventSubmit] [6/7] Firestore update completed successfully for event_id: ${event.eventId}',
+      );
+      // Create in-app notifications for all Student / Staff users.
+      await _createEventNotifications(
+        eventId: event.eventId,
+        eventTitle: event.title,
+        type: 'event_updated',
       );
       return null;
     } catch (e, stackTrace) {
@@ -639,12 +653,42 @@ class AdminRepository extends ChangeNotifier {
   }
 
   /// Updates status of an event in Firestore ('published' or 'cancelled').
+  /// When the new status is 'cancelled', creates an event_cancelled notification
+  /// for all Student and Staff users.
+  /// When the new status is 'published' and the current status is 'cancelled',
+  /// creates an event_republished notification instead.
+  /// No notification is created if the status is unchanged.
   Future<void> updateEventStatus(String id, String newStatus) async {
     try {
+      // Capture the current status before updating Firestore.
+      final event = _events.where((e) => e.eventId == id).firstOrNull;
+      final currentStatus = event?.status.toLowerCase() ?? '';
+
+      // Avoid duplicate notifications when status has not changed.
+      if (currentStatus == newStatus.toLowerCase()) return;
+
       await _firestore.collection('EVENTS').doc(id).update({
         'status': newStatus,
         'updated_at': Timestamp.fromDate(DateTime.now()),
       });
+
+      if (event != null) {
+        if (newStatus == 'cancelled') {
+          // cancelled notification when publishing → cancelling.
+          await _createEventNotifications(
+            eventId: event.eventId,
+            eventTitle: event.title,
+            type: 'event_cancelled',
+          );
+        } else if (newStatus == 'published' && currentStatus == 'cancelled') {
+          // re-published notification when cancelling → publishing.
+          await _createEventNotifications(
+            eventId: event.eventId,
+            eventTitle: event.title,
+            type: 'event_republished',
+          );
+        }
+      }
     } catch (e) {
       debugPrint('[AdminRepository] Update status error: $e');
       // Local fallback if offline
@@ -677,6 +721,82 @@ class AdminRepository extends ChangeNotifier {
       debugPrint('[AdminRepository] Delete event error: $e');
       _events.removeWhere((e) => e.eventId == id);
       notifyListeners();
+    }
+  }
+
+  // ============================================================
+  // NOTIFICATION HELPERS
+  // ============================================================
+
+  /// Batch-writes one NOTIFICATIONS document per Student/Staff user.
+  ///
+  /// [type] must be one of:
+  ///   'event_created', 'event_updated', 'event_cancelled', 'event_republished'.
+  /// Admin users are excluded from receiving event notifications.
+  /// Firestore batches are capped at 500 writes; for a campus with < 500
+  /// users this single batch is sufficient.
+  Future<void> _createEventNotifications({
+    required String eventId,
+    required String eventTitle,
+    required String type,
+  }) async {
+    try {
+      // Determine human-readable title and message from type.
+      final String notifTitle;
+      final String notifMessage;
+      switch (type) {
+        case 'event_created':
+          notifTitle = 'New Event Added';
+          notifMessage = '$eventTitle has been added.';
+        case 'event_updated':
+          notifTitle = 'Event Updated';
+          notifMessage = '$eventTitle details have been updated.';
+        case 'event_cancelled':
+          notifTitle = 'Event Cancelled';
+          notifMessage = '$eventTitle has been cancelled.';
+        case 'event_republished':
+          notifTitle = 'Event Re-published';
+          notifMessage = '$eventTitle has been re-published and is now available.';
+        default:
+          notifTitle = 'Event Notification';
+          notifMessage = eventTitle;
+      }
+
+      // Only target Student and Staff users (never Admin).
+      final recipients = _users
+          .where((u) => u.role == 'Student' || u.role == 'Staff')
+          .toList();
+
+      if (recipients.isEmpty) {
+        debugPrint('[Notifications] No Student/Staff users found; skipping.');
+        return;
+      }
+
+      final batch = _firestore.batch();
+      final now = Timestamp.fromDate(DateTime.now());
+
+      for (final user in recipients) {
+        final notifRef = _firestore.collection('NOTIFICATIONS').doc();
+        batch.set(notifRef, {
+          'notification_id': notifRef.id,
+          'user_id': user.uid,
+          'type': type,
+          'title': notifTitle,
+          'message': notifMessage,
+          'event_id': eventId,
+          'created_at': now,
+          'is_read': false,
+        });
+      }
+
+      await batch.commit();
+      debugPrint(
+        '[Notifications] Created $type notification for '
+        '${recipients.length} user(s). Event: $eventId',
+      );
+    } catch (e) {
+      // Notification failure must never crash the main event flow.
+      debugPrint('[Notifications] Failed to create notifications: $e');
     }
   }
 }

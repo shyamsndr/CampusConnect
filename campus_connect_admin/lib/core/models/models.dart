@@ -2,6 +2,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 
 class UserModel {
+  final String uid; // Firestore document ID (Firebase Auth UID)
   final String memberCode;
   final String name;
   final String email;
@@ -12,6 +13,7 @@ class UserModel {
   final DateTime createdAt;
 
   const UserModel({
+    required this.uid,
     required this.memberCode,
     required this.name,
     required this.email,
@@ -37,6 +39,7 @@ class UserModel {
     }
 
     return UserModel(
+      uid: doc.id,
       memberCode: (data['member_code'] as String?)?.trim() ?? '',
       name: (data['name'] as String?)?.trim() ?? '',
       email: (data['email'] as String?)?.trim() ?? '',
@@ -49,6 +52,7 @@ class UserModel {
   }
 
   UserModel copyWith({
+    String? uid,
     String? memberCode,
     String? name,
     String? email,
@@ -59,6 +63,7 @@ class UserModel {
     DateTime? createdAt,
   }) {
     return UserModel(
+      uid: uid ?? this.uid,
       memberCode: memberCode ?? this.memberCode,
       name: name ?? this.name,
       email: email ?? this.email,

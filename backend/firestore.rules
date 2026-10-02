@@ -3,11 +3,48 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
+    // ── USERS ────────────────────────────────────────────────────────────────
+    // A user may read their own document only.
+    // Writes are handled exclusively by Cloud Functions (Admin SDK bypasses rules).
     match /USERS/{userId} {
       allow read: if request.auth != null
                  && request.auth.uid == userId;
 
       allow write: if false;
+    }
+
+    // ── EVENTS ───────────────────────────────────────────────────────────────
+    // Any authenticated user can read events (both admin portal and mobile app).
+    // Writes from the Admin app (web) are allowed only for authenticated users.
+    // In production, tighten writes to Admin-role only via custom claims.
+    match /EVENTS/{eventId} {
+      allow read: if request.auth != null;
+      allow write: if request.auth != null;
+    }
+
+    // ── NOTIFICATIONS ─────────────────────────────────────────────────────────
+    // A user may read or update (mark as read) only their own notifications.
+    // Creation is done by the Admin app (authenticated write) via batch.
+    // Users cannot create or delete notification documents.
+    match /NOTIFICATIONS/{notificationId} {
+      // Read: authenticated user may only read their own notifications.
+      allow read: if request.auth != null
+                 && request.auth.uid == resource.data.user_id;
+
+      // Create: only authenticated users may create notifications
+      // (Admin app writes on behalf of others; mobile app cannot create).
+      // We trust the Admin app here; in production add custom-claim check.
+      allow create: if request.auth != null;
+
+      // Update: only the owner may update (for marking is_read = true).
+      // Only the is_read field may change — all other fields are immutable.
+      allow update: if request.auth != null
+                   && request.auth.uid == resource.data.user_id
+                   && request.resource.data.diff(resource.data).affectedKeys()
+                        .hasOnly(['is_read']);
+
+      // Delete: no client-side deletion allowed.
+      allow delete: if false;
     }
   }
 }

@@ -63,6 +63,7 @@ class _AddUserScreenState extends State<AddUserScreen> {
     final phone = _phoneController.text.trim();
 
     final newUser = UserModel(
+      uid: '', // Assigned by Firebase Auth via Cloud Function
       memberCode: memberCode,
       name: _nameController.text.trim(),
       email: _emailController.text.trim().toLowerCase(),

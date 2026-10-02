@@ -1,8 +1,10 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 
 import '../../core/constants/app_colors.dart';
 import '../../core/services/auth_service.dart';
 import '../auth/login_screen.dart';
+import '../notifications/notifications_screen.dart';
 
 class ProfileScreen extends StatelessWidget {
   final AuthService authService;
@@ -168,6 +170,11 @@ class ProfileScreen extends StatelessWidget {
 
             const SizedBox(height: 36),
 
+            // ── Notifications row ─────────────────────────────────────────
+            _NotificationsRow(authService: authService),
+
+            const SizedBox(height: 16),
+
             // Sign Out button
             SizedBox(
               width: double.infinity,
@@ -253,6 +260,100 @@ class _InfoTile extends StatelessWidget {
           ),
         ],
       ),
+    );
+  }
+}
+
+// =============================================================
+// NOTIFICATIONS ROW
+// =============================================================
+
+/// A tappable row that navigates to [NotificationsScreen] and shows
+/// a real-time unread-count badge streamed from Firestore.
+class _NotificationsRow extends StatelessWidget {
+  final AuthService authService;
+
+  const _NotificationsRow({required this.authService});
+
+  @override
+  Widget build(BuildContext context) {
+    final uid = authService.currentUser?.uid ?? '';
+
+    return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+      stream: FirebaseFirestore.instance
+          .collection('NOTIFICATIONS')
+          .where('user_id', isEqualTo: uid)
+          .where('is_read', isEqualTo: false)
+          .snapshots(),
+      builder: (context, snapshot) {
+        final unreadCount = snapshot.data?.docs.length ?? 0;
+
+        return GestureDetector(
+          onTap: () {
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (_) =>
+                    NotificationsScreen(authService: authService),
+              ),
+            );
+          },
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(color: AppColors.borderGrey),
+            ),
+            child: Row(
+              children: [
+                const Icon(
+                  Icons.notifications_outlined,
+                  color: AppColors.primaryBlue,
+                  size: 20,
+                ),
+                const SizedBox(width: 14),
+                const Expanded(
+                  child: Text(
+                    'Notifications',
+                    style: TextStyle(
+                      color: AppColors.textDark,
+                      fontSize: 14,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                ),
+                // Unread badge
+                if (unreadCount > 0)
+                  Container(
+                    margin: const EdgeInsets.only(right: 6),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 8,
+                      vertical: 2,
+                    ),
+                    decoration: BoxDecoration(
+                      color: AppColors.primaryBlue,
+                      borderRadius: BorderRadius.circular(20),
+                    ),
+                    child: Text(
+                      unreadCount > 99 ? '99+' : '$unreadCount',
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 11,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ),
+                const Icon(
+                  Icons.chevron_right_rounded,
+                  color: AppColors.textGrey,
+                  size: 20,
+                ),
+              ],
+            ),
+          ),
+        );
+      },
     );
   }
 }
