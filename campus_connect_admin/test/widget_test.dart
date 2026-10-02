@@ -3,8 +3,9 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:campus_connect_admin/main.dart';
 
 void main() {
-  testWidgets('CampusConnect Admin portal smoke test',
-      (WidgetTester tester) async {
+  testWidgets('CampusConnect Admin portal smoke test', (
+    WidgetTester tester,
+  ) async {
     // Set a desktop-sized test screen
     tester.view.physicalSize = const Size(1280, 800);
     tester.view.devicePixelRatio = 1.0;

@@ -78,38 +78,41 @@ class _ComplaintsScreenState extends State<ComplaintsScreen> {
                       mainAxisSize: MainAxisSize.min,
                       children: ['All', 'Pending', 'In Progress', 'Resolved']
                           .map((status) {
-                        final isSelected = _statusFilter == status;
-                        return InkWell(
-                          onTap: () {
-                            setState(() {
-                              _statusFilter = status;
-                            });
-                          },
-                          borderRadius: BorderRadius.circular(4),
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(
-                                horizontal: 12, vertical: 6),
-                            decoration: BoxDecoration(
-                              color: isSelected
-                                  ? AppColors.primaryLight
-                                  : Colors.transparent,
+                            final isSelected = _statusFilter == status;
+                            return InkWell(
+                              onTap: () {
+                                setState(() {
+                                  _statusFilter = status;
+                                });
+                              },
                               borderRadius: BorderRadius.circular(4),
-                            ),
-                            child: Text(
-                              status,
-                              style: TextStyle(
-                                fontSize: 12,
-                                fontWeight: isSelected
-                                    ? FontWeight.w600
-                                    : FontWeight.w500,
-                                color: isSelected
-                                    ? AppColors.primary
-                                    : AppColors.textDark,
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 12,
+                                  vertical: 6,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: isSelected
+                                      ? AppColors.primaryLight
+                                      : Colors.transparent,
+                                  borderRadius: BorderRadius.circular(4),
+                                ),
+                                child: Text(
+                                  status,
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    fontWeight: isSelected
+                                        ? FontWeight.w600
+                                        : FontWeight.w500,
+                                    color: isSelected
+                                        ? AppColors.primary
+                                        : AppColors.textDark,
+                                  ),
+                                ),
                               ),
-                            ),
-                          ),
-                        );
-                      }).toList(),
+                            );
+                          })
+                          .toList(),
                     ),
                   ),
                 ],
@@ -166,13 +169,15 @@ class _ComplaintsScreenState extends State<ComplaintsScreen> {
                                 ),
                                 DataCell(
                                   ConstrainedBox(
-                                    constraints:
-                                        const BoxConstraints(maxWidth: 220),
+                                    constraints: const BoxConstraints(
+                                      maxWidth: 220,
+                                    ),
                                     child: Text(
                                       c.title,
                                       overflow: TextOverflow.ellipsis,
                                       style: const TextStyle(
-                                          fontWeight: FontWeight.w500),
+                                        fontWeight: FontWeight.w500,
+                                      ),
                                     ),
                                   ),
                                 ),
@@ -185,7 +190,8 @@ class _ComplaintsScreenState extends State<ComplaintsScreen> {
                                       Text(
                                         c.submittedBy,
                                         style: const TextStyle(
-                                            fontWeight: FontWeight.w500),
+                                          fontWeight: FontWeight.w500,
+                                        ),
                                       ),
                                       Text(
                                         c.submittedByRole,
@@ -199,8 +205,9 @@ class _ComplaintsScreenState extends State<ComplaintsScreen> {
                                 ),
                                 DataCell(
                                   ConstrainedBox(
-                                    constraints:
-                                        const BoxConstraints(maxWidth: 180),
+                                    constraints: const BoxConstraints(
+                                      maxWidth: 180,
+                                    ),
                                     child: Text(
                                       c.location,
                                       overflow: TextOverflow.ellipsis,
@@ -218,7 +225,9 @@ class _ComplaintsScreenState extends State<ComplaintsScreen> {
                                   OutlinedButton(
                                     style: OutlinedButton.styleFrom(
                                       padding: const EdgeInsets.symmetric(
-                                          horizontal: 12, vertical: 6),
+                                        horizontal: 12,
+                                        vertical: 6,
+                                      ),
                                       minimumSize: Size.zero,
                                       tapTargetSize:
                                           MaterialTapTargetSize.shrinkWrap,

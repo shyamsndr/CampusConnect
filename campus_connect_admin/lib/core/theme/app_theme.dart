@@ -51,15 +51,12 @@ class AppTheme {
       inputDecorationTheme: InputDecorationTheme(
         filled: true,
         fillColor: AppColors.surface,
-        contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-        labelStyle: const TextStyle(
-          color: AppColors.textGrey,
-          fontSize: 14,
+        contentPadding: const EdgeInsets.symmetric(
+          horizontal: 14,
+          vertical: 12,
         ),
-        hintStyle: const TextStyle(
-          color: AppColors.textLight,
-          fontSize: 14,
-        ),
+        labelStyle: const TextStyle(color: AppColors.textGrey, fontSize: 14),
+        hintStyle: const TextStyle(color: AppColors.textLight, fontSize: 14),
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(6),
           borderSide: const BorderSide(color: AppColors.border, width: 1),
@@ -87,13 +84,8 @@ class AppTheme {
           foregroundColor: Colors.white,
           elevation: 0,
           padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(6),
-          ),
-          textStyle: const TextStyle(
-            fontSize: 14,
-            fontWeight: FontWeight.w600,
-          ),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
+          textStyle: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
         ),
       ),
       outlinedButtonTheme: OutlinedButtonThemeData(
@@ -101,13 +93,8 @@ class AppTheme {
           foregroundColor: AppColors.textDark,
           side: const BorderSide(color: AppColors.border, width: 1),
           padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(6),
-          ),
-          textStyle: const TextStyle(
-            fontSize: 14,
-            fontWeight: FontWeight.w500,
-          ),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
+          textStyle: const TextStyle(fontSize: 14, fontWeight: FontWeight.w500),
         ),
       ),
       dataTableTheme: DataTableThemeData(
@@ -118,10 +105,7 @@ class AppTheme {
           fontWeight: FontWeight.w600,
           letterSpacing: 0.2,
         ),
-        dataTextStyle: const TextStyle(
-          color: AppColors.textDark,
-          fontSize: 13,
-        ),
+        dataTextStyle: const TextStyle(color: AppColors.textDark, fontSize: 13),
         dividerThickness: 1,
         horizontalMargin: 16,
         columnSpacing: 24,

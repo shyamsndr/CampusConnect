@@ -68,11 +68,7 @@ class StatusBadge extends StatelessWidget {
         bg = const Color(0xFFF3F4F6);
     }
 
-    return StatusBadge(
-      label: status,
-      textColor: text,
-      backgroundColor: bg,
-    );
+    return StatusBadge(label: status, textColor: text, backgroundColor: bg);
   }
 
   @override

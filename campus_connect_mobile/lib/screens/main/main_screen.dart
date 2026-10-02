@@ -12,7 +12,11 @@ class MainScreen extends StatefulWidget {
   final AuthService authService;
   final int initialIndex;
 
-  const MainScreen({super.key, required this.authService, this.initialIndex = 0});
+  const MainScreen({
+    super.key,
+    required this.authService,
+    this.initialIndex = 0,
+  });
 
   @override
   State<MainScreen> createState() => _MainScreenState();

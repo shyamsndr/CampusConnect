@@ -46,10 +46,7 @@ class DashboardScreen extends StatelessWidget {
               const SizedBox(height: 4),
               const Text(
                 'Manage campus users, complaints and events from one place.',
-                style: TextStyle(
-                  fontSize: 14,
-                  color: AppColors.textGrey,
-                ),
+                style: TextStyle(fontSize: 14, color: AppColors.textGrey),
               ),
               const SizedBox(height: 24),
 
@@ -209,7 +206,9 @@ class DashboardScreen extends StatelessWidget {
                   children: [
                     Padding(
                       padding: const EdgeInsets.symmetric(
-                          horizontal: 20, vertical: 16),
+                        horizontal: 20,
+                        vertical: 16,
+                      ),
                       child: Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
@@ -268,21 +267,24 @@ class DashboardScreen extends StatelessWidget {
                               ),
                               DataCell(
                                 ConstrainedBox(
-                                  constraints:
-                                      const BoxConstraints(maxWidth: 240),
+                                  constraints: const BoxConstraints(
+                                    maxWidth: 240,
+                                  ),
                                   child: Text(
                                     c.title,
                                     overflow: TextOverflow.ellipsis,
                                     style: const TextStyle(
-                                        fontWeight: FontWeight.w500),
+                                      fontWeight: FontWeight.w500,
+                                    ),
                                   ),
                                 ),
                               ),
                               DataCell(Text(c.submittedBy)),
                               DataCell(
                                 ConstrainedBox(
-                                  constraints:
-                                      const BoxConstraints(maxWidth: 180),
+                                  constraints: const BoxConstraints(
+                                    maxWidth: 180,
+                                  ),
                                   child: Text(
                                     c.location,
                                     overflow: TextOverflow.ellipsis,
@@ -299,7 +301,9 @@ class DashboardScreen extends StatelessWidget {
                                 OutlinedButton(
                                   style: OutlinedButton.styleFrom(
                                     padding: const EdgeInsets.symmetric(
-                                        horizontal: 12, vertical: 6),
+                                      horizontal: 12,
+                                      vertical: 6,
+                                    ),
                                     minimumSize: Size.zero,
                                     tapTargetSize:
                                         MaterialTapTargetSize.shrinkWrap,
@@ -335,7 +339,9 @@ class DashboardScreen extends StatelessWidget {
                   children: [
                     Padding(
                       padding: const EdgeInsets.symmetric(
-                          horizontal: 20, vertical: 16),
+                        horizontal: 20,
+                        vertical: 16,
+                      ),
                       child: Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
@@ -395,7 +401,8 @@ class DashboardScreen extends StatelessWidget {
                                     Text(
                                       u.name,
                                       style: const TextStyle(
-                                          fontWeight: FontWeight.w500),
+                                        fontWeight: FontWeight.w500,
+                                      ),
                                     ),
                                   ],
                                 ),

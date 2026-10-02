@@ -36,10 +36,7 @@ class AdminProfileScreen extends StatelessWidget {
               const SizedBox(height: 2),
               const Text(
                 'Campus administration credentials and active session info.',
-                style: TextStyle(
-                  fontSize: 13,
-                  color: AppColors.textGrey,
-                ),
+                style: TextStyle(fontSize: 13, color: AppColors.textGrey),
               ),
               const SizedBox(height: 24),
 
@@ -95,7 +92,9 @@ class AdminProfileScreen extends StatelessWidget {
                               const SizedBox(height: 4),
                               Container(
                                 padding: const EdgeInsets.symmetric(
-                                    horizontal: 8, vertical: 2),
+                                  horizontal: 8,
+                                  vertical: 2,
+                                ),
                                 decoration: BoxDecoration(
                                   color: AppColors.statusResolvedBg,
                                   borderRadius: BorderRadius.circular(4),
@@ -153,8 +152,11 @@ class AdminProfileScreen extends StatelessWidget {
                     SizedBox(
                       width: double.infinity,
                       child: OutlinedButton.icon(
-                        icon: const Icon(Icons.logout,
-                            size: 18, color: Colors.redAccent),
+                        icon: const Icon(
+                          Icons.logout,
+                          size: 18,
+                          color: Colors.redAccent,
+                        ),
                         label: const Text(
                           'Sign Out of Admin Portal',
                           style: TextStyle(color: Colors.redAccent),

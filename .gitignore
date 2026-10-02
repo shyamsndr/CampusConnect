@@ -7,3 +7,8 @@ campus_connect_admin/.claude/
 # Local AI/development tool files
 backend/.agents/
 backend/.claude/
+
+# Environment / secrets
+.env
+.env.*
+!.env.example

@@ -49,7 +49,8 @@ class _ComplaintDetailsScreenState extends State<ComplaintDetailsScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final complaint = widget.repository.getComplaintById(widget.complaint.id) ??
+    final complaint =
+        widget.repository.getComplaintById(widget.complaint.id) ??
         widget.complaint;
 
     return SingleChildScrollView(
@@ -64,8 +65,10 @@ class _ComplaintDetailsScreenState extends State<ComplaintDetailsScreen> {
               Row(
                 children: [
                   IconButton(
-                    icon: const Icon(Icons.arrow_back,
-                        color: AppColors.textDark),
+                    icon: const Icon(
+                      Icons.arrow_back,
+                      color: AppColors.textDark,
+                    ),
                     onPressed: widget.onBack,
                     tooltip: 'Back to Complaints',
                   ),
@@ -260,10 +263,7 @@ class _ComplaintDetailsScreenState extends State<ComplaintDetailsScreen> {
                     const SizedBox(height: 6),
                     const Text(
                       'Change the current resolution phase to notify the reporting student or staff member.',
-                      style: TextStyle(
-                        fontSize: 13,
-                        color: AppColors.textGrey,
-                      ),
+                      style: TextStyle(fontSize: 13, color: AppColors.textGrey),
                     ),
                     const SizedBox(height: 16),
 

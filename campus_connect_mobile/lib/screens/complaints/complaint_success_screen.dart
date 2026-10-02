@@ -45,10 +45,8 @@ class _ComplaintSuccessScreenState extends State<ComplaintSuccessScreen>
     Navigator.pushAndRemoveUntil(
       context,
       MaterialPageRoute(
-        builder: (_) => MainScreen(
-          authService: widget.authService,
-          initialIndex: 0,
-        ),
+        builder: (_) =>
+            MainScreen(authService: widget.authService, initialIndex: 0),
       ),
       (route) => false,
     );
@@ -58,10 +56,8 @@ class _ComplaintSuccessScreenState extends State<ComplaintSuccessScreen>
     Navigator.pushAndRemoveUntil(
       context,
       MaterialPageRoute(
-        builder: (_) => MainScreen(
-          authService: widget.authService,
-          initialIndex: 1,
-        ),
+        builder: (_) =>
+            MainScreen(authService: widget.authService, initialIndex: 1),
       ),
       (route) => false,
     );

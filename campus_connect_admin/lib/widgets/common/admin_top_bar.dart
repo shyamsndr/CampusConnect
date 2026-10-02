@@ -28,9 +28,7 @@ class AdminTopBar extends StatelessWidget {
       padding: const EdgeInsets.symmetric(horizontal: 24),
       decoration: const BoxDecoration(
         color: AppColors.surface,
-        border: Border(
-          bottom: BorderSide(color: AppColors.border, width: 1),
-        ),
+        border: Border(bottom: BorderSide(color: AppColors.border, width: 1)),
       ),
       child: Row(
         children: [
@@ -69,10 +67,7 @@ class AdminTopBar extends StatelessWidget {
               ],
             ),
           ),
-          if (trailing != null) ...[
-            trailing!,
-            const SizedBox(width: 16),
-          ],
+          if (trailing != null) ...[trailing!, const SizedBox(width: 16)],
           // Admin Profile Pill / Quick Menu
           InkWell(
             onTap: onProfilePressed,

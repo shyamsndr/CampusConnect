@@ -61,9 +61,7 @@ class ProfileScreen extends StatelessWidget {
     // cannot return to Home by pressing the back button.
     Navigator.pushAndRemoveUntil(
       context,
-      MaterialPageRoute(
-        builder: (_) => LoginScreen(authService: authService),
-      ),
+      MaterialPageRoute(builder: (_) => LoginScreen(authService: authService)),
       (route) => false,
     );
   }
@@ -240,10 +238,7 @@ class _InfoTile extends StatelessWidget {
             children: [
               Text(
                 label,
-                style: const TextStyle(
-                  color: AppColors.textGrey,
-                  fontSize: 11,
-                ),
+                style: const TextStyle(color: AppColors.textGrey, fontSize: 11),
               ),
               const SizedBox(height: 2),
               Text(

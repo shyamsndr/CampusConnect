@@ -120,7 +120,8 @@ class _ReportIssueScreenState extends State<ReportIssueScreen> {
       Navigator.pushReplacement(
         context,
         MaterialPageRoute(
-          builder: (_) => ComplaintSuccessScreen(authService: widget.authService),
+          builder: (_) =>
+              ComplaintSuccessScreen(authService: widget.authService),
         ),
       );
     });

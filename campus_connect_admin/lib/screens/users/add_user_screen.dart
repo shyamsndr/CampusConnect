@@ -108,7 +108,6 @@ class _AddUserScreenState extends State<AddUserScreen> {
     widget.onUserAdded();
   }
 
-
   @override
   Widget build(BuildContext context) {
     return SingleChildScrollView(
@@ -365,7 +364,7 @@ class _AddUserScreenState extends State<AddUserScreen> {
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                 const Text(
+                                const Text(
                                   'Phone *',
                                   style: TextStyle(
                                     fontSize: 13,
@@ -387,7 +386,6 @@ class _AddUserScreenState extends State<AddUserScreen> {
                                     return null;
                                   },
                                 ),
-
                               ],
                             ),
                           ),

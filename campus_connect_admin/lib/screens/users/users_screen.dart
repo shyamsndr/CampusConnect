@@ -102,17 +102,17 @@ class _UsersScreenState extends State<UsersScreen> {
                                 setState(() => _searchQuery = value),
                             decoration: InputDecoration(
                               hintText: 'Search members...',
-                              prefixIcon:
-                                  const Icon(Icons.search, size: 18),
+                              prefixIcon: const Icon(Icons.search, size: 18),
                               suffixIcon: _searchQuery.isNotEmpty
                                   ? IconButton(
-                                      icon:
-                                          const Icon(Icons.clear, size: 16),
+                                      icon: const Icon(Icons.clear, size: 16),
                                       onPressed: _clearSearch,
                                     )
                                   : null,
                               contentPadding: const EdgeInsets.symmetric(
-                                  horizontal: 12, vertical: 8),
+                                horizontal: 12,
+                                vertical: 8,
+                              ),
                             ),
                           ),
                         ),
@@ -125,7 +125,9 @@ class _UsersScreenState extends State<UsersScreen> {
                         onPressed: widget.onAddUser,
                         style: ElevatedButton.styleFrom(
                           padding: const EdgeInsets.symmetric(
-                              horizontal: 16, vertical: 11),
+                            horizontal: 16,
+                            vertical: 11,
+                          ),
                         ),
                       ),
                     ],
@@ -293,8 +295,7 @@ class _UsersScreenState extends State<UsersScreen> {
             : _minTableWidth;
 
         // Compute column widths from flex weights.
-        final totalFlex =
-            _columns.fold<int>(0, (sum, col) => sum + col.$2);
+        final totalFlex = _columns.fold<int>(0, (sum, col) => sum + col.$2);
 
         return SingleChildScrollView(
           scrollDirection: Axis.horizontal,
@@ -307,22 +308,20 @@ class _UsersScreenState extends State<UsersScreen> {
                 Container(
                   decoration: const BoxDecoration(
                     color: AppColors.background,
-                    borderRadius:
-                        BorderRadius.vertical(top: Radius.circular(7)),
+                    borderRadius: BorderRadius.vertical(
+                      top: Radius.circular(7),
+                    ),
                   ),
                   child: Row(
                     children: _columns.map((col) {
-                      final width =
-                          (tableWidth * col.$2) / totalFlex;
-                      return _HeaderCell(
-                          label: col.$1, width: width);
+                      final width = (tableWidth * col.$2) / totalFlex;
+                      return _HeaderCell(label: col.$1, width: width);
                     }).toList(),
                   ),
                 ),
 
                 // ── Divider ──────────────────────────────────────────────
-                const Divider(
-                    height: 1, color: AppColors.border),
+                const Divider(height: 1, color: AppColors.border),
 
                 // ── Data rows ────────────────────────────────────────────
                 ...users.asMap().entries.map((entry) {
@@ -357,8 +356,7 @@ class _UsersScreenState extends State<UsersScreen> {
       return SizedBox(
         width: (tableWidth * flex) / totalFlex,
         child: Padding(
-          padding:
-              const EdgeInsets.symmetric(horizontal: 16, vertical: 13),
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 13),
           child: child,
         ),
       );
@@ -412,10 +410,7 @@ class _UsersScreenState extends State<UsersScreen> {
         cell(
           Text(
             user.email.isNotEmpty ? user.email : '—',
-            style: const TextStyle(
-              fontSize: 13,
-              color: AppColors.textDark,
-            ),
+            style: const TextStyle(fontSize: 13, color: AppColors.textDark),
             overflow: TextOverflow.ellipsis,
           ),
           4,
@@ -451,8 +446,7 @@ class _UsersScreenState extends State<UsersScreen> {
           color: isEven ? AppColors.surface : AppColors.background,
           child: row,
         ),
-        if (!isLast)
-          const Divider(height: 1, color: AppColors.borderLight),
+        if (!isLast) const Divider(height: 1, color: AppColors.borderLight),
       ],
     );
   }

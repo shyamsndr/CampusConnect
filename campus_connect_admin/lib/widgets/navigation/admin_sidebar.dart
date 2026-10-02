@@ -31,9 +31,7 @@ class AdminSidebar extends StatelessWidget {
       width: 250,
       decoration: const BoxDecoration(
         color: AppColors.sidebarBackground,
-        border: Border(
-          right: BorderSide(color: AppColors.border, width: 1),
-        ),
+        border: Border(right: BorderSide(color: AppColors.border, width: 1)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -147,8 +145,7 @@ class AdminSidebar extends StatelessWidget {
               ),
             ),
             child: InkWell(
-              onTap: () =>
-                  onDestinationSelected(AdminNavDestination.profile),
+              onTap: () => onDestinationSelected(AdminNavDestination.profile),
               borderRadius: BorderRadius.circular(6),
               child: Padding(
                 padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 6),
@@ -239,8 +236,7 @@ class AdminSidebar extends StatelessWidget {
             ),
             if (badgeCount != null)
               Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                 decoration: BoxDecoration(
                   color: isSelected
                       ? AppColors.primary
