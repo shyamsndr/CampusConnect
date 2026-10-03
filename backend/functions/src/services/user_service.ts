@@ -1,4 +1,4 @@
-import { adminDb } from "../config/firebase";
+import {adminDb} from "../config/firebase";
 
 interface UserProfile {
   user_id: string;
@@ -51,4 +51,4 @@ export async function deleteUserProfile(userId: string): Promise<void> {
     .collection("USERS")
     .doc(userId)
     .delete();
-}
+}

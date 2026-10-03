@@ -1,7 +1,8 @@
 import {onCall, HttpsError} from "firebase-functions/v2/https";
+import {onDocumentCreated} from "firebase-functions/v2/firestore";
 import {FieldValue} from "firebase-admin/firestore";
 
-import {adminDb} from "./config/firebase";
+import {adminDb, adminMessaging} from "./config/firebase";
 import {
   checkAuthEmailExists,
   createAuthUser,
@@ -219,5 +220,79 @@ export const createUser = onCall(async (request) => {
       "Unable to create the user. Please try again.",
       {code: "FIREBASE_ERROR"},
     );
+  }
+});
+
+// ── 9. Notification Trigger ──────────────────────────────────────────────────
+export const sendNotificationOnCreate = onDocumentCreated("NOTIFICATIONS/{notificationId}", async (event) => {
+  const snapshot = event.data;
+  if (!snapshot) {
+    console.log("No data associated with the event");
+    return;
+  }
+
+  const data = snapshot.data();
+  const userId = data.user_id;
+  const notificationId = event.params.notificationId;
+
+  if (!userId) {
+    console.log(`[Notification ${notificationId}] No user_id found in the notification document`);
+    return;
+  }
+
+  // Find the target user in Firestore
+  const userDoc = await adminDb.collection("USERS").doc(userId).get();
+
+  if (!userDoc.exists) {
+    console.log(`[Notification ${notificationId}] Target user ${userId} not found in USERS collection`);
+    return;
+  }
+
+  const userData = userDoc.data() || {};
+  const fcmToken = userData.fcm_token;
+
+  if (!fcmToken) {
+    console.log(`[Notification ${notificationId}] Target user ${userId} has no FCM token. Skipping notification.`);
+    return;
+  }
+
+  // Prepare FCM Message
+  const message = {
+    token: fcmToken,
+    notification: {
+      title: data.title || "Notification",
+      body: data.message || "",
+    },
+    data: {
+      event_id: data.event_id || "",
+      type: data.type || "",
+    },
+  };
+
+  console.log(`[Notification ${notificationId}] Prepared FCM Payload for user ${userId}:`, JSON.stringify(message));
+
+  // Real FCM delivery logic
+  try {
+    const response = await adminMessaging.send(message);
+    console.log(`[Notification ${notificationId}] Successfully sent FCM message to user ${userId}. Message ID: ${response}`);
+  } catch (error: any) {
+    console.error(`[Notification ${notificationId}] Error sending FCM message to user ${userId}:`, error);
+    
+    // Check for invalid or unregistered tokens and clean them up
+    if (
+      error?.code === "messaging/invalid-registration-token" ||
+      error?.code === "messaging/registration-token-not-registered" ||
+      error?.code === "messaging/invalid-argument"
+    ) {
+      console.log(`[Notification ${notificationId}] Token is invalid or unregistered. Removing token for user ${userId}.`);
+      try {
+        await adminDb.collection("USERS").doc(userId).update({
+          fcm_token: FieldValue.delete(),
+        });
+        console.log(`[Notification ${notificationId}] Successfully removed invalid FCM token for user ${userId}.`);
+      } catch (cleanupError) {
+        console.error(`[Notification ${notificationId}] Failed to remove invalid FCM token for user ${userId}:`, cleanupError);
+      }
+    }
   }
 });

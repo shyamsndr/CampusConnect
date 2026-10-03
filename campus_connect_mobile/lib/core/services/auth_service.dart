@@ -1,6 +1,10 @@
+import 'dart:async';
+
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
+import 'package:firebase_messaging/firebase_messaging.dart';
+import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 
 import '../models/user_model.dart';
 
@@ -24,6 +28,7 @@ class AuthService extends ChangeNotifier {
 
   bool _isInitializing = true;
   UserModel? _currentUser;
+  StreamSubscription<String>? _fcmTokenSubscription;
 
   bool get isInitializing => _isInitializing;
   UserModel? get currentUser => _currentUser;
@@ -51,6 +56,7 @@ class AuthService extends ChangeNotifier {
       }
 
       await _loadUserProfile(user.uid);
+      await _setupFCMToken();
     } catch (e) {
       debugPrint('[AuthService] Session restore failed: $e');
       _currentUser = null;
@@ -106,6 +112,7 @@ class AuthService extends ChangeNotifier {
 
       // Load the Firestore profile using the Firebase UID.
       await _loadUserProfile(firebaseUser.uid);
+      await _setupFCMToken();
 
       notifyListeners();
       return null;
@@ -125,9 +132,112 @@ class AuthService extends ChangeNotifier {
   ///
   /// Does NOT delete any Firestore data, complaints, events, or notifications.
   Future<void> signOut() async {
+    if (_currentUser != null) {
+      try {
+        await _firestore.collection('USERS').doc(_currentUser!.uid).update({
+          'fcm_token': FieldValue.delete(),
+        });
+      } catch (e) {
+        debugPrint('[AuthService] Failed to clear FCM token on logout: $e');
+      }
+    }
+    
+    _fcmTokenSubscription?.cancel();
+    _fcmTokenSubscription = null;
+    
     await _auth.signOut();
     _currentUser = null;
     notifyListeners();
+  }
+
+  // ============================================================
+  // FCM TOKEN HANDLING
+  // ============================================================
+
+  Future<void> _setupFCMToken() async {
+    if (_currentUser == null) return;
+
+    try {
+      final messaging = FirebaseMessaging.instance;
+      
+      // Request permission (Required for Android 13+ and iOS)
+      await messaging.requestPermission(
+        alert: true,
+        badge: true,
+        sound: true,
+      );
+
+      // Initialize local notifications for foreground display on Android
+      final flutterLocalNotificationsPlugin =
+          FlutterLocalNotificationsPlugin();
+      
+      const initializationSettingsAndroid =
+          AndroidInitializationSettings('@mipmap/ic_launcher');
+      const initializationSettings =
+          InitializationSettings(android: initializationSettingsAndroid);
+      
+      await flutterLocalNotificationsPlugin.initialize(
+        settings: initializationSettings,
+      );
+
+      const androidNotificationChannel = AndroidNotificationChannel(
+        'high_importance_channel', // id
+        'High Importance Notifications', // title
+        description: 'This channel is used for important notifications.', // description
+        importance: Importance.max,
+      );
+
+      await flutterLocalNotificationsPlugin
+          .resolvePlatformSpecificImplementation<
+              AndroidFlutterLocalNotificationsPlugin>()
+          ?.createNotificationChannel(androidNotificationChannel);
+
+      // Listen for foreground messages
+      FirebaseMessaging.onMessage.listen((RemoteMessage message) {
+        final notification = message.notification;
+        final android = message.notification?.android;
+
+        if (notification != null && android != null) {
+          flutterLocalNotificationsPlugin.show(
+            id: notification.hashCode,
+            title: notification.title,
+            body: notification.body,
+            notificationDetails: NotificationDetails(
+              android: AndroidNotificationDetails(
+                androidNotificationChannel.id,
+                androidNotificationChannel.name,
+                channelDescription: androidNotificationChannel.description,
+                icon: '@mipmap/ic_launcher',
+              ),
+            ),
+          );
+        }
+      });
+
+      // Get current token
+      final token = await messaging.getToken();
+      if (token != null) {
+        await _saveTokenToFirestore(token);
+      }
+
+      // Listen for token refreshes
+      _fcmTokenSubscription?.cancel();
+      _fcmTokenSubscription = messaging.onTokenRefresh.listen(_saveTokenToFirestore);
+    } catch (e) {
+      debugPrint('[AuthService] Failed to setup FCM: $e');
+    }
+  }
+
+  Future<void> _saveTokenToFirestore(String token) async {
+    if (_currentUser == null) return;
+    try {
+      await _firestore.collection('USERS').doc(_currentUser!.uid).update({
+        'fcm_token': token,
+      });
+      debugPrint('[AuthService] Saved FCM token for user ${_currentUser!.uid}');
+    } catch (e) {
+      debugPrint('[AuthService] Failed to save FCM token: $e');
+    }
   }
 
   // ============================================================

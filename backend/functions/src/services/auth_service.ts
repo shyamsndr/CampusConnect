@@ -1,4 +1,4 @@
-import { adminAuth } from "../config/firebase";
+import {adminAuth} from "../config/firebase";
 
 interface CreateAuthUserData {
   email: string;
@@ -32,4 +32,4 @@ export async function checkAuthEmailExists(email: string): Promise<boolean> {
     }
     throw error;
   }
-}
+}

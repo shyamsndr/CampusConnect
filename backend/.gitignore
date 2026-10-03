@@ -70,3 +70,6 @@ node_modules/
 
 # Compiled Cloud Functions output
 lib/
+
+# Firebase Service Account
+serviceAccountKey.json

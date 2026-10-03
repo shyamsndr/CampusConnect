@@ -10,7 +10,11 @@ service cloud.firestore {
       allow read: if request.auth != null
                  && request.auth.uid == userId;
 
-      allow write: if false;
+      // Users can only update their own fcm_token.
+      allow update: if request.auth != null
+                   && request.auth.uid == userId
+                   && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['fcm_token']);
+      allow create, delete: if false;
     }
 
     // ── EVENTS ───────────────────────────────────────────────────────────────
