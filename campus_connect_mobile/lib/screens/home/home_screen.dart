@@ -6,6 +6,7 @@ import '../../core/services/auth_service.dart';
 import '../../widgets/common/event_poster_image.dart';
 import '../complaints/report_issue_screen.dart';
 import '../events/event_details_screen.dart';
+import '../main/main_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   final AuthService authService;
@@ -310,9 +311,20 @@ class _HomeScreenState extends State<HomeScreen> {
 
             Expanded(
               child: _QuickActionCard(
-                icon: Icons.remove_rounded,
+                icon: Icons.assignment_outlined,
                 title: 'My',
                 subtitle: 'Complaints',
+                onTap: () {
+                  Navigator.pushReplacement(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => MainScreen(
+                        authService: widget.authService,
+                        initialIndex: 1,
+                      ),
+                    ),
+                  );
+                },
               ),
             ),
           ],

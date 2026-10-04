@@ -275,81 +275,177 @@ class AdminRepository extends ChangeNotifier {
   }
 
   // ============================================================
-  // INITIAL REALISTIC CAMPUS COMPLAINTS
+  // INITIAL REALISTIC CAMPUS COMPLAINTS (Phase 0 — Mock Data)
+  // ONE ROW = ONE ISSUE (possibly multiple reporters)
   // ============================================================
 
   final List<ComplaintModel> _complaints = [
     ComplaintModel(
-      id: 'CMP-2026-101',
-      title: 'Lab 3 Air Conditioning Failure',
+      id: 'ISS-2026-001',
+      title: 'Fan not working',
       description:
-          'AC unit #2 in Computer Lab 3 (Block B) stopped cooling during practical exams. Temperature in the lab is exceeding 34°C, causing systems to overheat.',
-      submittedBy: 'Prof. Ananya Sen',
-      submittedByRole: 'Staff',
-      location: 'Block B, 2nd Floor, Lab 3',
-      priority: 'High',
-      status: 'In Progress',
-      reportedAt: DateTime(2026, 9, 13, 10, 30),
-    ),
-    ComplaintModel(
-      id: 'CMP-2026-102',
-      title: 'Projector Bulb Flickering in Seminar Hall B',
-      description:
-          'The ceiling-mounted HDMI projector turns off intermittently every 10 minutes during guest lectures.',
-      submittedBy: 'Dr. Vikram Joshi',
-      submittedByRole: 'Staff',
-      location: 'Main Block, Seminar Hall B',
-      priority: 'Medium',
-      status: 'Pending',
-      reportedAt: DateTime(2026, 9, 12, 14, 15),
-    ),
-    ComplaintModel(
-      id: 'CMP-2026-103',
-      title: 'Water Leakage Near Restroom Corridor',
-      description:
-          'Continuous dripping from the overhead pipe joint near the 3rd-floor boy restroom. Floor is wet and slippery.',
-      submittedBy: 'Aarav Patel',
+          'The ceiling fan in F06 classroom has stopped working completely. Multiple students and the class teacher have reported discomfort due to extreme heat during lectures.',
+      submittedBy: 'Rahul S',
       submittedByRole: 'Student',
-      location: 'Academic Block C, 3rd Floor',
+      location: 'F06 Classroom',
       priority: 'High',
-      status: 'Pending',
-      reportedAt: DateTime(2026, 9, 12, 11, 00),
+      status: 'Open',
+      reportedAt: DateTime(2026, 10, 4, 10, 30),
+      affectedUsers: [
+        AffectedUser(name: 'Rahul S', memberCode: 'MCA001', type: 'Student', department: 'MCA', reportTitle: 'Fan not working', reportDescription: 'The fan in F06 classroom is not turning on.', reportDate: DateTime(2026, 10, 4, 10, 30), photoUrl: 'Photo A'),
+        AffectedUser(name: 'Anjali P', memberCode: 'MCA014', type: 'Student', department: 'MCA', reportTitle: 'Classroom fan problem', reportDescription: 'The ceiling fan near the last bench is not working.', reportDate: DateTime(2026, 10, 4, 10, 42), photoUrl: 'Photo B'),
+        AffectedUser(name: 'Sreenath K', memberCode: 'MBA021', type: 'Student', department: 'MBA', reportTitle: 'No air circulation', reportDescription: 'One of the fans in F06 has stopped working.', reportDate: DateTime(2026, 10, 4, 11, 05), photoUrl: 'Photo C'),
+        AffectedUser(name: 'Staff 1', memberCode: 'ST004', type: 'Staff', department: 'Maintenance', reportTitle: 'F06 Fan replacement needed', reportDescription: 'Confirmed fan motor is burnt.', reportDate: DateTime(2026, 10, 4, 11, 30)),
+        AffectedUser(name: 'Divya R', memberCode: 'MCA032', type: 'Student', department: 'MCA', reportTitle: 'Fan issue F06', reportDescription: 'Too hot in class', reportDate: DateTime(2026, 10, 4, 12, 00)),
+      ],
+      statusHistory: [
+        AdminComplaintStatusEntry(
+          status: 'Open',
+          timestamp: DateTime(2026, 10, 4, 10, 30),
+          note: 'Complaint submitted',
+        ),
+      ],
     ),
     ComplaintModel(
-      id: 'CMP-2026-104',
-      title: 'Broken Bench in Reading Room 2',
+      id: 'ISS-2026-002',
+      title: 'Water leakage near staircase',
       description:
-          'Wooden support plank cracked on study table #8. Needs carpenter inspection.',
+          'Continuous water dripping from overhead pipe near the Block A staircase. Floor is wet and poses a safety hazard. Reported by multiple students.',
+      submittedBy: 'Meera K',
+      submittedByRole: 'Student',
+      location: 'Block A',
+      priority: 'Medium',
+      status: 'In Progress',
+      reportedAt: DateTime(2026, 9, 28, 9, 15),
+      affectedUsers: [
+        AffectedUser(name: 'Meera K', memberCode: 'BCA008', type: 'Student', department: 'BCA', reportTitle: 'Leakage', reportDescription: 'Water leaking.', reportDate: DateTime(2026, 9, 28, 9, 15)),
+        AffectedUser(name: 'Arjun T', memberCode: 'BCA012', type: 'Student', department: 'BCA', reportTitle: 'Pipe break', reportDescription: 'Pipe broken.', reportDate: DateTime(2026, 9, 28, 9, 20)),
+      ],
+      statusHistory: [
+        AdminComplaintStatusEntry(
+          status: 'Open',
+          timestamp: DateTime(2026, 9, 28, 9, 15),
+          note: 'Complaint submitted',
+        ),
+        AdminComplaintStatusEntry(
+          status: 'In Progress',
+          timestamp: DateTime(2026, 9, 30, 11, 20),
+          note: 'Work started by maintenance team',
+        ),
+      ],
+    ),
+    ComplaintModel(
+      id: 'ISS-2026-003',
+      title: 'AC not working in Computer Lab',
+      description:
+          'The air conditioning unit in the Computer Lab is not cooling. Temperature is rising, causing discomfort and equipment heat issues during lab sessions.',
+      submittedBy: 'Dr. Vikram J',
+      submittedByRole: 'Staff',
+      location: 'Computer Lab',
+      priority: 'High',
+      status: 'Open',
+      reportedAt: DateTime(2026, 10, 2, 8, 0),
+      affectedUsers: [
+        AffectedUser(name: 'Dr. Vikram J', memberCode: 'ST003', type: 'Staff', department: 'CS', reportTitle: 'AC issue', reportDescription: 'AC is not working.', reportDate: DateTime(2026, 10, 2, 8, 0)),
+        AffectedUser(name: 'Priya M', memberCode: 'MCA007', type: 'Student', department: 'MCA', reportTitle: 'Hot lab', reportDescription: 'Lab is hot.', reportDate: DateTime(2026, 10, 2, 8, 30)),
+        AffectedUser(name: 'Karan R', memberCode: 'MCA019', type: 'Student', department: 'MCA', reportTitle: 'AC', reportDescription: 'Fix AC please.', reportDate: DateTime(2026, 10, 2, 9, 0)),
+      ],
+      statusHistory: [
+        AdminComplaintStatusEntry(
+          status: 'Open',
+          timestamp: DateTime(2026, 10, 2, 8, 0),
+          note: 'Complaint submitted',
+        ),
+      ],
+    ),
+    ComplaintModel(
+      id: 'ISS-2026-004',
+      title: 'Projector not working in Seminar Hall',
+      description:
+          'The ceiling-mounted projector in Seminar Hall B turns off intermittently every 10 minutes. This is disrupting guest lectures and presentations.',
+      submittedBy: 'Prof. Ananya S',
+      submittedByRole: 'Staff',
+      location: 'Seminar Hall B',
+      priority: 'Medium',
+      status: 'Open',
+      reportedAt: DateTime(2026, 9, 12, 14, 15),
+      affectedUsers: [
+        AffectedUser(name: 'Prof. Ananya S', memberCode: 'ST007', type: 'Staff', department: 'MBA', reportTitle: 'Projector', reportDescription: 'Projector is off.', reportDate: DateTime(2026, 9, 12, 14, 15)),
+        AffectedUser(name: 'Rohan V', memberCode: 'MBA003', type: 'Student', department: 'MBA', reportTitle: 'No display', reportDescription: 'Display off.', reportDate: DateTime(2026, 9, 12, 14, 20)),
+      ],
+      statusHistory: [
+        AdminComplaintStatusEntry(
+          status: 'Open',
+          timestamp: DateTime(2026, 9, 12, 14, 15),
+          note: 'Complaint submitted',
+        ),
+      ],
+    ),
+    // ── CLOSED ISSUES ──────────────────────────────────────────────────────
+    ComplaintModel(
+      id: 'ISS-2026-005',
+      title: 'Light not working in Library',
+      description:
+          'Two tube lights in the library reading area on the 1st floor are not functioning. Poor lighting is affecting student study sessions significantly.',
       submittedBy: 'Priya Sundaram',
       submittedByRole: 'Student',
       location: 'Central Library, 1st Floor',
       priority: 'Low',
-      status: 'Resolved',
-      reportedAt: DateTime(2026, 9, 10, 16, 45),
+      status: 'Closed',
+      reportedAt: DateTime(2026, 9, 20, 14, 45),
+      affectedUsers: [
+        AffectedUser(name: 'Priya Sundaram', memberCode: 'BCA022', type: 'Student', department: 'BCA', reportTitle: 'Light off', reportDescription: 'Light is off.', reportDate: DateTime(2026, 9, 20, 14, 45)),
+      ],
+      statusHistory: [
+        AdminComplaintStatusEntry(
+          status: 'Open',
+          timestamp: DateTime(2026, 9, 20, 14, 45),
+          note: 'Complaint submitted',
+        ),
+        AdminComplaintStatusEntry(
+          status: 'In Progress',
+          timestamp: DateTime(2026, 9, 22, 10, 0),
+          note: 'Electrician assigned and work in progress',
+        ),
+        AdminComplaintStatusEntry(
+          status: 'Closed',
+          timestamp: DateTime(2026, 9, 23, 16, 30),
+          note: 'Lights replaced and issue resolved',
+        ),
+      ],
     ),
     ComplaintModel(
-      id: 'CMP-2026-105',
-      title: 'Wi-Fi Access Point Offline in Hostel Block 4',
+      id: 'ISS-2026-006',
+      title: 'Cafeteria water dispenser filter clogged',
       description:
-          'Hostel wing students unable to connect to campus network; access point router shows red power LED.',
-      submittedBy: 'Rohan Mehra',
-      submittedByRole: 'Student',
-      location: 'Boys Hostel Block 4, Ground Floor',
-      priority: 'Medium',
-      status: 'In Progress',
-      reportedAt: DateTime(2026, 9, 9, 20, 10),
-    ),
-    ComplaintModel(
-      id: 'CMP-2026-106',
-      title: 'Cafeteria Water Dispenser Filter Clogged',
-      description:
-          'Water flow rate is extremely low and requires cartridge replacement.',
+          'Water flow rate from the dispenser in the cafeteria is extremely low. The filter cartridge requires replacement immediately.',
       submittedBy: 'Aarav Patel',
       submittedByRole: 'Student',
       location: 'Student Activity Center, Cafeteria',
       priority: 'Low',
-      status: 'Resolved',
+      status: 'Closed',
       reportedAt: DateTime(2026, 9, 8, 13, 20),
+      affectedUsers: [
+        AffectedUser(name: 'Aarav Patel', memberCode: 'MBA009', type: 'Student', department: 'MBA', reportTitle: 'Filter', reportDescription: 'Filter clogged.', reportDate: DateTime(2026, 9, 8, 13, 20)),
+        AffectedUser(name: 'Sneha L', memberCode: 'BCA031', type: 'Student', department: 'BCA', reportTitle: 'Water flow', reportDescription: 'Low water flow.', reportDate: DateTime(2026, 9, 8, 13, 25)),
+      ],
+      statusHistory: [
+        AdminComplaintStatusEntry(
+          status: 'Open',
+          timestamp: DateTime(2026, 9, 8, 13, 20),
+          note: 'Complaint submitted',
+        ),
+        AdminComplaintStatusEntry(
+          status: 'In Progress',
+          timestamp: DateTime(2026, 9, 9, 9, 0),
+          note: 'Maintenance team scheduled for replacement',
+        ),
+        AdminComplaintStatusEntry(
+          status: 'Closed',
+          timestamp: DateTime(2026, 9, 10, 11, 45),
+          note: 'Filter cartridge replaced and dispenser restored',
+        ),
+      ],
     ),
   ];
 
@@ -365,10 +461,16 @@ class AdminRepository extends ChangeNotifier {
   int get totalComplaints => _complaints.length;
 
   int get pendingComplaints =>
-      _complaints.where((c) => c.status == 'Pending').length;
+      _complaints.where((c) => c.status == 'Open').length;
 
   int get resolvedComplaints =>
-      _complaints.where((c) => c.status == 'Resolved').length;
+      _complaints.where((c) => c.status == 'Closed').length;
+
+  List<ComplaintModel> get openComplaints =>
+      _complaints.where((c) => c.status != 'Closed').toList();
+
+  List<ComplaintModel> get closedComplaints =>
+      _complaints.where((c) => c.status == 'Closed').toList();
 
   List<ComplaintModel> get recentComplaints {
     final sorted = List<ComplaintModel>.from(_complaints)

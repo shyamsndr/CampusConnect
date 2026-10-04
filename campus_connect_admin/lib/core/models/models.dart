@@ -76,6 +76,40 @@ class UserModel {
   }
 }
 
+class AffectedUser {
+  final String name;
+  final String memberCode;
+  final String type; // 'Student', 'Staff'
+  final String department;
+  final String reportTitle;
+  final String reportDescription;
+  final DateTime reportDate;
+  final String? photoUrl;
+
+  const AffectedUser({
+    required this.name,
+    required this.memberCode,
+    required this.type,
+    required this.department,
+    required this.reportTitle,
+    required this.reportDescription,
+    required this.reportDate,
+    this.photoUrl,
+  });
+}
+
+class AdminComplaintStatusEntry {
+  final String status;
+  final DateTime timestamp;
+  final String note;
+
+  const AdminComplaintStatusEntry({
+    required this.status,
+    required this.timestamp,
+    required this.note,
+  });
+}
+
 class ComplaintModel {
   final String id;
   final String title;
@@ -84,9 +118,11 @@ class ComplaintModel {
   final String submittedByRole;
   final String location;
   final String priority; // 'Low', 'Medium', 'High'
-  final String status; // 'Pending', 'In Progress', 'Resolved'
+  final String status; // 'Open', 'In Progress', 'Closed'  (was: Pending/In Progress/Resolved)
   final DateTime reportedAt;
   final String? photoUrl;
+  final List<AffectedUser> affectedUsers;
+  final List<AdminComplaintStatusEntry> statusHistory;
 
   const ComplaintModel({
     required this.id,
@@ -99,6 +135,8 @@ class ComplaintModel {
     required this.status,
     required this.reportedAt,
     this.photoUrl,
+    this.affectedUsers = const [],
+    this.statusHistory = const [],
   });
 
   ComplaintModel copyWith({
@@ -112,6 +150,8 @@ class ComplaintModel {
     String? status,
     DateTime? reportedAt,
     String? photoUrl,
+    List<AffectedUser>? affectedUsers,
+    List<AdminComplaintStatusEntry>? statusHistory,
   }) {
     return ComplaintModel(
       id: id ?? this.id,
@@ -124,6 +164,8 @@ class ComplaintModel {
       status: status ?? this.status,
       reportedAt: reportedAt ?? this.reportedAt,
       photoUrl: photoUrl ?? this.photoUrl,
+      affectedUsers: affectedUsers ?? this.affectedUsers,
+      statusHistory: statusHistory ?? this.statusHistory,
     );
   }
 }

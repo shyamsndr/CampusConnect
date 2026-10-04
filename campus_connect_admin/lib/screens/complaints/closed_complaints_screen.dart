@@ -4,25 +4,24 @@ import '../../core/models/models.dart';
 import '../../core/services/admin_repository.dart';
 import '../../widgets/common/status_badge.dart';
 
-/// Admin screen listing all OPEN campus issues (Open + In Progress).
-/// One row = one consolidated issue (possibly from multiple reporters).
+/// Admin screen listing all CLOSED campus issues.
 ///
 /// Phase 0 — uses static mock data only.
-class ComplaintsScreen extends StatefulWidget {
+class ClosedComplaintsScreen extends StatefulWidget {
   final AdminRepository repository;
   final ValueChanged<ComplaintModel> onSelectComplaint;
 
-  const ComplaintsScreen({
+  const ClosedComplaintsScreen({
     super.key,
     required this.repository,
     required this.onSelectComplaint,
   });
 
   @override
-  State<ComplaintsScreen> createState() => _ComplaintsScreenState();
+  State<ClosedComplaintsScreen> createState() => _ClosedComplaintsScreenState();
 }
 
-class _ComplaintsScreenState extends State<ComplaintsScreen> {
+class _ClosedComplaintsScreenState extends State<ClosedComplaintsScreen> {
   final TextEditingController _searchController = TextEditingController();
   String _searchQuery = '';
   String _priorityFilter = 'All';
@@ -57,7 +56,6 @@ class _ComplaintsScreenState extends State<ComplaintsScreen> {
 
   List<ComplaintModel> _applyFilters(List<ComplaintModel> source) {
     var list = source.where((c) {
-      // Search
       if (_searchQuery.isNotEmpty) {
         final q = _searchQuery.toLowerCase();
         if (!c.title.toLowerCase().contains(q) &&
@@ -66,14 +64,12 @@ class _ComplaintsScreenState extends State<ComplaintsScreen> {
           return false;
         }
       }
-      // Priority
       if (_priorityFilter != 'All' && c.priority != _priorityFilter) {
         return false;
       }
       return true;
     }).toList();
 
-    // Sort
     switch (_sortOrder) {
       case 'Newest First':
         list.sort((a, b) => b.reportedAt.compareTo(a.reportedAt));
@@ -100,30 +96,34 @@ class _ComplaintsScreenState extends State<ComplaintsScreen> {
     return list;
   }
 
+  /// Returns the closing date from the status history (last 'Closed' entry).
+  DateTime _closedDate(ComplaintModel c) {
+    try {
+      return c.statusHistory
+          .lastWhere((e) => e.status == 'Closed')
+          .timestamp;
+    } catch (_) {
+      return c.reportedAt;
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return ListenableBuilder(
       listenable: widget.repository,
       builder: (context, _) {
-        final openIssues = widget.repository.openComplaints;
-        final filtered = _applyFilters(openIssues);
+        final closedIssues = widget.repository.closedComplaints;
+        final filtered = _applyFilters(closedIssues);
 
         return SingleChildScrollView(
           padding: const EdgeInsets.all(24),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              // ── Header ───────────────────────────────────────────────────
-              _buildHeader(openIssues.length, filtered.length),
-
+              _buildHeader(closedIssues.length),
               const SizedBox(height: 20),
-
-              // ── Controls Bar ─────────────────────────────────────────────
               _buildControlsBar(),
-
               const SizedBox(height: 16),
-
-              // ── Table ────────────────────────────────────────────────────
               _buildTable(filtered),
             ],
           ),
@@ -132,7 +132,7 @@ class _ComplaintsScreenState extends State<ComplaintsScreen> {
     );
   }
 
-  Widget _buildHeader(int total, int showing) {
+  Widget _buildHeader(int total) {
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -141,7 +141,7 @@ class _ComplaintsScreenState extends State<ComplaintsScreen> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               const Text(
-                'Open Complaints',
+                'Closed Complaints',
                 style: TextStyle(
                   fontSize: 20,
                   fontWeight: FontWeight.w700,
@@ -150,9 +150,9 @@ class _ComplaintsScreenState extends State<ComplaintsScreen> {
                 ),
               ),
               const SizedBox(height: 3),
-              Text(
-                'Active and in-progress issues reported by students and staff. Each row represents one consolidated issue.',
-                style: const TextStyle(fontSize: 13, color: AppColors.textGrey),
+              const Text(
+                'Resolved and closed campus issues. These have been fully addressed by the maintenance team.',
+                style: TextStyle(fontSize: 13, color: AppColors.textGrey),
               ),
             ],
           ),
@@ -161,13 +161,13 @@ class _ComplaintsScreenState extends State<ComplaintsScreen> {
         Container(
           padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
           decoration: BoxDecoration(
-            color: AppColors.primaryLight,
+            color: const Color(0xFFECFDF5),
             borderRadius: BorderRadius.circular(6),
           ),
           child: Text(
-            '$total Open',
+            '$total Closed',
             style: const TextStyle(
-              color: AppColors.primary,
+              color: Color(0xFF047857),
               fontWeight: FontWeight.w700,
               fontSize: 13,
             ),
@@ -184,7 +184,6 @@ class _ComplaintsScreenState extends State<ComplaintsScreen> {
       alignment: WrapAlignment.start,
       crossAxisAlignment: WrapCrossAlignment.center,
       children: [
-        // Search
         SizedBox(
           width: 260,
           height: 38,
@@ -193,7 +192,7 @@ class _ComplaintsScreenState extends State<ComplaintsScreen> {
             onChanged: (v) => setState(() => _searchQuery = v),
             style: const TextStyle(fontSize: 13, color: AppColors.textDark),
             decoration: InputDecoration(
-              hintText: 'Search complaints…',
+              hintText: 'Search closed complaints…',
               hintStyle: const TextStyle(
                 fontSize: 13,
                 color: AppColors.textGrey,
@@ -224,31 +223,27 @@ class _ComplaintsScreenState extends State<ComplaintsScreen> {
             ),
           ),
         ),
-
-        // Priority filter
         _buildDropdown(
-          label: 'Priority',
           value: _priorityFilter,
           items: _priorityOptions,
           onChanged: (v) => setState(() => _priorityFilter = v!),
+          hint: 'Priority',
         ),
-
-        // Sort
         _buildDropdown(
-          label: 'Sort',
           value: _sortOrder,
           items: _sortOptions,
           onChanged: (v) => setState(() => _sortOrder = v!),
+          hint: 'Sort',
         ),
       ],
     );
   }
 
   Widget _buildDropdown({
-    required String label,
     required String value,
     required List<String> items,
     required ValueChanged<String?> onChanged,
+    required String hint,
   }) {
     return Container(
       height: 38,
@@ -287,7 +282,7 @@ class _ComplaintsScreenState extends State<ComplaintsScreen> {
               padding: const EdgeInsets.all(48),
               alignment: Alignment.center,
               child: const Text(
-                'No open complaints match your filters.',
+                'No closed complaints match your filters.',
                 style: TextStyle(fontSize: 14, color: AppColors.textGrey),
               ),
             )
@@ -356,17 +351,7 @@ class _ComplaintsScreenState extends State<ComplaintsScreen> {
                   ),
                   DataColumn(
                     label: Text(
-                      'Date',
-                      style: TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.w700,
-                        color: AppColors.textGrey,
-                      ),
-                    ),
-                  ),
-                  DataColumn(
-                    label: Text(
-                      'Status',
+                      'Closed Date',
                       style: TextStyle(
                         fontSize: 12,
                         fontWeight: FontWeight.w700,
@@ -387,10 +372,11 @@ class _ComplaintsScreenState extends State<ComplaintsScreen> {
                 ],
                 rows: List.generate(complaints.length, (i) {
                   final c = complaints[i];
-                  final date =
-                      '${c.reportedAt.day.toString().padLeft(2, '0')}/'
-                      '${c.reportedAt.month.toString().padLeft(2, '0')}/'
-                      '${c.reportedAt.year}';
+                  final closedDt = _closedDate(c);
+                  final closedDate =
+                      '${closedDt.day.toString().padLeft(2, '0')}/'
+                      '${closedDt.month.toString().padLeft(2, '0')}/'
+                      '${closedDt.year}';
                   return DataRow(
                     onSelectChanged: (_) => widget.onSelectComplaint(c),
                     cells: [
@@ -462,9 +448,8 @@ class _ComplaintsScreenState extends State<ComplaintsScreen> {
                         ),
                       ),
                       DataCell(
-                        Text(date, style: const TextStyle(fontSize: 13)),
+                        Text(closedDate, style: const TextStyle(fontSize: 13)),
                       ),
-                      DataCell(StatusBadge.fromStatus(c.status)),
                       DataCell(
                         OutlinedButton(
                           style: OutlinedButton.styleFrom(

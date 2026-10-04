@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../../core/constants/app_colors.dart';
 import '../../core/models/models.dart';
 import '../../core/services/admin_repository.dart';
+import '../../screens/complaints/closed_complaints_screen.dart';
 import '../../screens/complaints/complaint_details_screen.dart';
 import '../../screens/complaints/complaints_screen.dart';
 import '../../screens/dashboard/dashboard_screen.dart';
@@ -69,7 +70,9 @@ class _AdminLayoutState extends State<AdminLayout> {
       case AdminNavDestination.addUser:
         return 'Add Authorized Member';
       case AdminNavDestination.complaints:
-        return 'Campus Complaints';
+        return 'Open Campus Complaints';
+      case AdminNavDestination.closedComplaints:
+        return 'Closed Campus Complaints';
       case AdminNavDestination.events:
         return 'Campus Events';
       case AdminNavDestination.profile:
@@ -96,6 +99,8 @@ class _AdminLayoutState extends State<AdminLayout> {
         return 'Pre-authorize college member credentials';
       case AdminNavDestination.complaints:
         return 'Review and update status of reported issues';
+      case AdminNavDestination.closedComplaints:
+        return 'View resolved and closed campus issues';
       case AdminNavDestination.events:
         return 'Manage and publish college events';
       case AdminNavDestination.profile:
@@ -155,6 +160,11 @@ class _AdminLayoutState extends State<AdminLayout> {
         );
       case AdminNavDestination.complaints:
         return ComplaintsScreen(
+          repository: widget.repository,
+          onSelectComplaint: _onSelectComplaint,
+        );
+      case AdminNavDestination.closedComplaints:
+        return ClosedComplaintsScreen(
           repository: widget.repository,
           onSelectComplaint: _onSelectComplaint,
         );

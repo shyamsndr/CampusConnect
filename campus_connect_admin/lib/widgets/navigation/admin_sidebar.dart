@@ -8,6 +8,7 @@ enum AdminNavDestination {
   users,
   addUser,
   complaints,
+  closedComplaints,
   events,
   profile,
 }
@@ -118,12 +119,19 @@ class AdminSidebar extends StatelessWidget {
                 const SizedBox(height: 4),
                 _buildNavItem(
                   destination: AdminNavDestination.complaints,
-                  title: 'Complaints',
+                  title: 'Open Complaints',
                   icon: Icons.report_problem_outlined,
                   selectedIcon: Icons.report_problem,
                   badgeCount: repository.pendingComplaints > 0
                       ? repository.pendingComplaints
                       : null,
+                ),
+                const SizedBox(height: 4),
+                _buildNavItem(
+                  destination: AdminNavDestination.closedComplaints,
+                  title: 'Closed Complaints',
+                  icon: Icons.check_circle_outline,
+                  selectedIcon: Icons.check_circle,
                 ),
                 const SizedBox(height: 4),
                 _buildNavItem(

@@ -77,132 +77,135 @@ class ProfileScreen extends StatelessWidget {
     final user = authService.currentUser;
 
     return SafeArea(
-      child: SingleChildScrollView(
-        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 28),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text(
-              'Profile',
-              style: TextStyle(
-                color: AppColors.textDark,
-                fontSize: 26,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-
-            const SizedBox(height: 24),
-
-            // Avatar and name
-            Center(
-              child: Column(
-                children: [
-                  Container(
-                    width: 88,
-                    height: 88,
-                    decoration: BoxDecoration(
-                      color: AppColors.primaryBlue.withValues(alpha: 0.12),
-                      shape: BoxShape.circle,
-                    ),
-                    child: const Icon(
-                      Icons.person_rounded,
-                      size: 52,
-                      color: AppColors.primaryBlue,
-                    ),
-                  ),
-
-                  const SizedBox(height: 14),
-
-                  Text(
-                    user?.name ?? '',
-                    style: const TextStyle(
-                      color: AppColors.textDark,
-                      fontSize: 20,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-
-                  const SizedBox(height: 4),
-
-                  Text(
-                    user?.role ?? '',
-                    style: const TextStyle(
-                      color: AppColors.textGrey,
-                      fontSize: 13,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-
-            const SizedBox(height: 32),
-
-            // Profile details
-            _InfoTile(
-              icon: Icons.badge_outlined,
-              label: 'Member Code',
-              value: user?.memberCode ?? '-',
-            ),
-
-            _InfoTile(
-              icon: Icons.email_outlined,
-              label: 'Email',
-              value: user?.email ?? '-',
-            ),
-
-            _InfoTile(
-              icon: Icons.school_outlined,
-              label: 'Department',
-              value: user?.department ?? '-',
-            ),
-
-            _InfoTile(
-              icon: Icons.phone_outlined,
-              label: 'Phone',
-              value: user?.phone ?? '-',
-            ),
-
-            _InfoTile(
-              icon: Icons.circle_outlined,
-              label: 'Status',
-              value: user?.status ?? '-',
-            ),
-
-            const SizedBox(height: 36),
-
-            // ── Notifications row ─────────────────────────────────────────
-            _NotificationsRow(authService: authService),
-
-            const SizedBox(height: 16),
-
-            // Sign Out button
-            SizedBox(
-              width: double.infinity,
-              height: 50,
-              child: OutlinedButton.icon(
-                onPressed: () => _handleSignOut(context),
-                style: OutlinedButton.styleFrom(
-                  side: const BorderSide(color: Colors.redAccent),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(14),
-                  ),
+      child: ScrollConfiguration(
+        behavior: const MaterialScrollBehavior().copyWith(overscroll: false),
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 28),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                'Profile',
+                style: TextStyle(
+                  color: AppColors.textDark,
+                  fontSize: 26,
+                  fontWeight: FontWeight.bold,
                 ),
-                icon: const Icon(
-                  Icons.logout_rounded,
-                  color: Colors.redAccent,
-                  size: 20,
+              ),
+
+              const SizedBox(height: 24),
+
+              // Avatar and name
+              Center(
+                child: Column(
+                  children: [
+                    Container(
+                      width: 88,
+                      height: 88,
+                      decoration: BoxDecoration(
+                        color: AppColors.primaryBlue.withValues(alpha: 0.12),
+                        shape: BoxShape.circle,
+                      ),
+                      child: const Icon(
+                        Icons.person_rounded,
+                        size: 52,
+                        color: AppColors.primaryBlue,
+                      ),
+                    ),
+
+                    const SizedBox(height: 14),
+
+                    Text(
+                      user?.name ?? '',
+                      style: const TextStyle(
+                        color: AppColors.textDark,
+                        fontSize: 20,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+
+                    const SizedBox(height: 4),
+
+                    Text(
+                      user?.role ?? '',
+                      style: const TextStyle(
+                        color: AppColors.textGrey,
+                        fontSize: 13,
+                      ),
+                    ),
+                  ],
                 ),
-                label: const Text(
-                  'Sign Out',
-                  style: TextStyle(
+              ),
+
+              const SizedBox(height: 32),
+
+              // Profile details
+              _InfoTile(
+                icon: Icons.badge_outlined,
+                label: 'Member Code',
+                value: user?.memberCode ?? '-',
+              ),
+
+              _InfoTile(
+                icon: Icons.email_outlined,
+                label: 'Email',
+                value: user?.email ?? '-',
+              ),
+
+              _InfoTile(
+                icon: Icons.school_outlined,
+                label: 'Department',
+                value: user?.department ?? '-',
+              ),
+
+              _InfoTile(
+                icon: Icons.phone_outlined,
+                label: 'Phone',
+                value: user?.phone ?? '-',
+              ),
+
+              _InfoTile(
+                icon: Icons.circle_outlined,
+                label: 'Status',
+                value: user?.status ?? '-',
+              ),
+
+              const SizedBox(height: 36),
+
+              // ── Notifications row ─────────────────────────────────────────
+              _NotificationsRow(authService: authService),
+
+              const SizedBox(height: 16),
+
+              // Sign Out button
+              SizedBox(
+                width: double.infinity,
+                height: 50,
+                child: OutlinedButton.icon(
+                  onPressed: () => _handleSignOut(context),
+                  style: OutlinedButton.styleFrom(
+                    side: const BorderSide(color: Colors.redAccent),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(14),
+                    ),
+                  ),
+                  icon: const Icon(
+                    Icons.logout_rounded,
                     color: Colors.redAccent,
-                    fontSize: 15,
-                    fontWeight: FontWeight.w600,
+                    size: 20,
+                  ),
+                  label: const Text(
+                    'Sign Out',
+                    style: TextStyle(
+                      color: Colors.redAccent,
+                      fontSize: 15,
+                      fontWeight: FontWeight.w600,
+                    ),
                   ),
                 ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );
