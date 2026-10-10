@@ -428,23 +428,29 @@ class _ClosedComplaintsScreenState extends State<ClosedComplaintsScreen> {
                       ),
                       DataCell(StatusBadge.fromStatus(c.priority)),
                       DataCell(
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 10,
-                            vertical: 4,
-                          ),
-                          decoration: BoxDecoration(
-                            color: AppColors.primaryLight,
-                            borderRadius: BorderRadius.circular(4),
-                          ),
-                          child: Text(
-                            '${c.affectedUsers.length} affected',
-                            style: const TextStyle(
-                              color: AppColors.primary,
-                              fontSize: 12,
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
+                        StreamBuilder<List<AffectedUser>>(
+                          stream: widget.repository.getAffectedUsers(c.id),
+                          builder: (context, snapshot) {
+                            final count = snapshot.data?.length ?? 0;
+                            return Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 10,
+                                vertical: 4,
+                              ),
+                              decoration: BoxDecoration(
+                                color: AppColors.primaryLight,
+                                borderRadius: BorderRadius.circular(4),
+                              ),
+                              child: Text(
+                                '$count affected',
+                                style: const TextStyle(
+                                  color: AppColors.primary,
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            );
+                          },
                         ),
                       ),
                       DataCell(

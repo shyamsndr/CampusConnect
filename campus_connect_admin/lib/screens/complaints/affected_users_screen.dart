@@ -5,49 +5,104 @@ import '../../core/models/models.dart';
 class AffectedUsersScreen extends StatelessWidget {
   final List<AffectedUser> affectedUsers;
   final String complaintId;
+  final VoidCallback onBack;
 
   const AffectedUsersScreen({
     super.key,
     required this.affectedUsers,
     required this.complaintId,
+    required this.onBack,
   });
+
+  void _showImageOverlay(BuildContext context, String imageUrl) {
+    showDialog(
+      context: context,
+      useSafeArea: false,
+      builder: (context) {
+        return Scaffold(
+          backgroundColor: Colors.black.withValues(alpha: 0.9),
+          body: Stack(
+            children: [
+              Positioned.fill(
+                child: InteractiveViewer(
+                  minScale: 1.0,
+                  maxScale: 4.0,
+                  child: Image.network(
+                    imageUrl,
+                    fit: BoxFit.contain,
+                    errorBuilder: (context, error, stackTrace) => const Center(
+                      child: Icon(Icons.broken_image, color: Colors.white54, size: 48),
+                    ),
+                    loadingBuilder: (context, child, loadingProgress) {
+                      if (loadingProgress == null) return child;
+                      return const Center(
+                        child: CircularProgressIndicator(color: Colors.white),
+                      );
+                    },
+                  ),
+                ),
+              ),
+              Positioned(
+                top: 24,
+                right: 24,
+                child: IconButton(
+                  icon: const Icon(Icons.close, color: Colors.white, size: 32),
+                  onPressed: () => Navigator.of(context).pop(),
+                  tooltip: 'Close',
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: AppColors.background,
-      appBar: AppBar(
-        backgroundColor: AppColors.surface,
-        elevation: 1,
-        title: Text(
-          'Linked Reports: $complaintId',
-          style: const TextStyle(
-            color: AppColors.textDark,
-            fontSize: 18,
-            fontWeight: FontWeight.bold,
-          ),
-        ),
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: AppColors.textDark),
-          onPressed: () => Navigator.pop(context),
-        ),
-      ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(24),
-        child: Center(
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 800),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: affectedUsers.map((user) => _buildReportCard(user)).toList(),
-            ),
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(24),
+      child: Center(
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 800),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              // ── Header (Back & Title) ──────────────────────────────────
+              Row(
+                children: [
+                  IconButton(
+                    onPressed: onBack,
+                    icon: const Icon(Icons.arrow_back),
+                    tooltip: 'Back to Details',
+                    color: AppColors.textDark,
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      'Linked Reports: $complaintId',
+                      style: const TextStyle(
+                        fontSize: 20,
+                        fontWeight: FontWeight.w700,
+                        color: AppColors.textDark,
+                        letterSpacing: -0.3,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 24),
+              
+              // ── Main Content Area ──────────────────────────────────────
+              ...affectedUsers.map((user) => _buildReportCard(context, user)),
+            ],
           ),
         ),
       ),
     );
   }
 
-  Widget _buildReportCard(AffectedUser user) {
+  Widget _buildReportCard(BuildContext context, AffectedUser user) {
     final date =
         '${user.reportDate.day.toString().padLeft(2, '0')}/'
         '${user.reportDate.month.toString().padLeft(2, '0')}/'
@@ -167,33 +222,46 @@ class AffectedUsersScreen extends StatelessWidget {
 
           if (user.photoUrl != null) ...[
             const SizedBox(height: 20),
-            Container(
-              height: 120,
-              decoration: BoxDecoration(
-                color: const Color(0xFFF9FBFE),
+            InkWell(
+              onTap: () => _showImageOverlay(context, user.photoUrl!.replaceAll('10.0.2.2', '127.0.0.1')),
+              child: ClipRRect(
                 borderRadius: BorderRadius.circular(6),
-                border: Border.all(
-                  color: AppColors.border,
-                ),
-              ),
-              alignment: Alignment.center,
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  const Icon(
-                    Icons.image,
-                    size: 32,
-                    color: AppColors.textLight,
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    'Attached: ${user.photoUrl}',
-                    style: const TextStyle(
-                      fontSize: 13,
-                      color: AppColors.textGrey,
+                child: Image.network(
+                  user.photoUrl!.replaceAll('10.0.2.2', '127.0.0.1'),
+                  height: 140,
+                  width: double.infinity,
+                  fit: BoxFit.cover,
+                  errorBuilder: (context, error, stackTrace) => Container(
+                    height: 120,
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFF9FBFE),
+                      borderRadius: BorderRadius.circular(6),
+                      border: Border.all(color: AppColors.border),
+                    ),
+                    alignment: Alignment.center,
+                    child: const Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(Icons.broken_image, size: 32, color: AppColors.textLight),
+                        SizedBox(height: 8),
+                        Text('Image failed to load', style: TextStyle(fontSize: 13, color: AppColors.textGrey)),
+                      ],
                     ),
                   ),
-                ],
+                  loadingBuilder: (context, child, loadingProgress) {
+                    if (loadingProgress == null) return child;
+                    return Container(
+                      height: 140,
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFF9FBFE),
+                        borderRadius: BorderRadius.circular(6),
+                        border: Border.all(color: AppColors.border),
+                      ),
+                      alignment: Alignment.center,
+                      child: const CircularProgressIndicator(),
+                    );
+                  },
+                ),
               ),
             ),
           ],

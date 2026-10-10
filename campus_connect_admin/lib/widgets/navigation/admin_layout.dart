@@ -11,6 +11,7 @@ import '../../screens/events/events_screen.dart';
 import '../../screens/profile/admin_profile_screen.dart';
 import '../../screens/users/add_user_screen.dart';
 import '../../screens/users/users_screen.dart';
+import '../../screens/complaints/affected_users_screen.dart';
 import '../common/admin_top_bar.dart';
 import 'admin_sidebar.dart';
 
@@ -29,6 +30,8 @@ class _AdminLayoutState extends State<AdminLayout> {
 
   AdminNavDestination _currentDestination = AdminNavDestination.dashboard;
   ComplaintModel? _selectedComplaint;
+  List<AffectedUser>? _affectedUsers;
+  String? _affectedUsersComplaintId;
   bool _isAddingEvent = false;
   EventModel? _eventToEdit;
 
@@ -36,6 +39,8 @@ class _AdminLayoutState extends State<AdminLayout> {
     setState(() {
       _currentDestination = destination;
       _selectedComplaint = null;
+      _affectedUsers = null;
+      _affectedUsersComplaintId = null;
       _isAddingEvent = false;
       _eventToEdit = null;
     });
@@ -47,14 +52,18 @@ class _AdminLayoutState extends State<AdminLayout> {
 
   void _onSelectComplaint(ComplaintModel complaint) {
     setState(() {
-      _currentDestination = AdminNavDestination.complaints;
       _selectedComplaint = complaint;
+      _affectedUsers = null;
+      _affectedUsersComplaintId = null;
       _isAddingEvent = false;
       _eventToEdit = null;
     });
   }
 
   String _getPageTitle() {
+    if (_affectedUsers != null) {
+      return 'Linked Reports';
+    }
     if (_selectedComplaint != null) {
       return 'Complaint Details';
     }
@@ -81,6 +90,9 @@ class _AdminLayoutState extends State<AdminLayout> {
   }
 
   String? _getPageSubtitle() {
+    if (_affectedUsers != null) {
+      return 'Complaint #${_affectedUsersComplaintId!}';
+    }
     if (_selectedComplaint != null) {
       return 'Complaint #${_selectedComplaint!.id}';
     }
@@ -109,6 +121,19 @@ class _AdminLayoutState extends State<AdminLayout> {
   }
 
   Widget _buildContent() {
+    if (_affectedUsers != null) {
+      return AffectedUsersScreen(
+        affectedUsers: _affectedUsers!,
+        complaintId: _affectedUsersComplaintId!,
+        onBack: () {
+          setState(() {
+            _affectedUsers = null;
+            _affectedUsersComplaintId = null;
+          });
+        },
+      );
+    }
+
     if (_selectedComplaint != null) {
       return ComplaintDetailsScreen(
         complaint: _selectedComplaint!,
@@ -116,6 +141,12 @@ class _AdminLayoutState extends State<AdminLayout> {
         onBack: () {
           setState(() {
             _selectedComplaint = null;
+          });
+        },
+        onViewAffectedUsers: (users, complaintId) {
+          setState(() {
+            _affectedUsers = users;
+            _affectedUsersComplaintId = complaintId;
           });
         },
       );

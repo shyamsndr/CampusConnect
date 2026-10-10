@@ -5,6 +5,7 @@ import 'package:image_picker/image_picker.dart';
 
 import '../../core/constants/app_colors.dart';
 import '../../core/services/auth_service.dart';
+import '../../core/services/complaint_service.dart';
 import 'complaint_success_screen.dart';
 
 class ReportIssueScreen extends StatefulWidget {
@@ -104,7 +105,9 @@ class _ReportIssueScreenState extends State<ReportIssueScreen> {
     });
   }
 
-  void _submitIssue() {
+  final ComplaintService _complaintService = ComplaintService();
+
+  void _submitIssue() async {
     if (!_formKey.currentState!.validate()) {
       return;
     }
@@ -113,8 +116,14 @@ class _ReportIssueScreenState extends State<ReportIssueScreen> {
       _isSubmitting = true;
     });
 
-    // Firebase submission will be added here.
-    Future.delayed(const Duration(milliseconds: 700), () {
+    try {
+      await _complaintService.submitComplaint(
+        title: _titleController.text.trim(),
+        description: _descriptionController.text.trim(),
+        location: _locationController.text.trim(),
+        imageFile: _selectedImage,
+      );
+
       if (!mounted) return;
 
       Navigator.pushReplacement(
@@ -124,7 +133,21 @@ class _ReportIssueScreenState extends State<ReportIssueScreen> {
               ComplaintSuccessScreen(authService: widget.authService),
         ),
       );
-    });
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(e.toString().replaceAll('Exception: ', '')),
+          backgroundColor: Colors.red,
+        ),
+      );
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isSubmitting = false;
+        });
+      }
+    }
   }
 
   @override

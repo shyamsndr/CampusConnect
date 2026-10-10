@@ -1,19 +1,27 @@
 import 'package:flutter/material.dart';
 import '../../core/constants/app_colors.dart';
-import '../../core/models/complaint_model.dart';
+import '../../core/models/issue_model.dart';
+import '../../core/models/issue_status_history_model.dart';
+import '../../core/services/complaint_service.dart';
 import '../../widgets/complaints/status_chip.dart';
 
 /// Shows the full detail of a single user complaint including
 /// complaint info, optional photo, and a vertical status timeline.
-///
-/// Phase 0 — uses static mock data only.
-class ComplaintDetailScreen extends StatelessWidget {
-  final ComplaintModel complaint;
+class ComplaintDetailScreen extends StatefulWidget {
+  final IssueModel complaint;
 
   const ComplaintDetailScreen({super.key, required this.complaint});
 
   @override
+  State<ComplaintDetailScreen> createState() => _ComplaintDetailScreenState();
+}
+
+class _ComplaintDetailScreenState extends State<ComplaintDetailScreen> {
+  final ComplaintService _complaintService = ComplaintService();
+
+  @override
   Widget build(BuildContext context) {
+    final complaint = widget.complaint;
     final createdDate =
         '${complaint.createdAt.day.toString().padLeft(2, '0')}/'
         '${complaint.createdAt.month.toString().padLeft(2, '0')}/'
@@ -92,24 +100,42 @@ class ComplaintDetailScreen extends StatelessWidget {
         borderRadius: BorderRadius.circular(14),
         border: Border.all(color: AppColors.borderGrey),
       ),
-      child: const Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(
-            Icons.image_outlined,
-            size: 38,
-            color: AppColors.textGrey,
-          ),
-          SizedBox(height: 8),
-          Text(
-            'No photo attached',
-            style: TextStyle(
-              color: AppColors.textGrey,
-              fontSize: 12,
+      child: widget.complaint.primaryImageUrl != null
+          ? ClipRRect(
+              borderRadius: BorderRadius.circular(13),
+              child: Image.network(
+                widget.complaint.primaryImageUrl!,
+                fit: BoxFit.cover,
+                errorBuilder: (context, error, stackTrace) {
+                  return const Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(Icons.broken_image_outlined, size: 38, color: AppColors.textGrey),
+                      SizedBox(height: 8),
+                      Text('Error loading photo', style: TextStyle(color: AppColors.textGrey, fontSize: 12)),
+                    ],
+                  );
+                },
+              ),
+            )
+          : const Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(
+                  Icons.image_outlined,
+                  size: 38,
+                  color: AppColors.textGrey,
+                ),
+                SizedBox(height: 8),
+                Text(
+                  'No photo attached',
+                  style: TextStyle(
+                    color: AppColors.textGrey,
+                    fontSize: 12,
+                  ),
+                ),
+              ],
             ),
-          ),
-        ],
-      ),
     );
   }
 
@@ -118,6 +144,7 @@ class ComplaintDetailScreen extends StatelessWidget {
     required String createdDate,
     required String createdTime,
   }) {
+    final complaint = widget.complaint;
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(18),
@@ -163,7 +190,7 @@ class ComplaintDetailScreen extends StatelessWidget {
           _buildMetaRow(
             icon: Icons.tag_outlined,
             label: 'Complaint ID',
-            value: complaint.id,
+            value: complaint.issueId,
           ),
           const SizedBox(height: 12),
           _buildMetaRow(
@@ -247,7 +274,7 @@ class ComplaintDetailScreen extends StatelessWidget {
           ),
           const SizedBox(height: 10),
           Text(
-            complaint.description,
+            widget.complaint.description,
             style: const TextStyle(
               color: AppColors.textGrey,
               fontSize: 13,
@@ -260,59 +287,77 @@ class ComplaintDetailScreen extends StatelessWidget {
   }
 
   Widget _buildStatusTimeline() {
-    final history = complaint.statusHistory;
+    return StreamBuilder<List<IssueStatusHistoryModel>>(
+      stream: _complaintService.getIssueStatusHistory(widget.complaint.issueId),
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const Center(child: CircularProgressIndicator());
+        }
 
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(18),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: AppColors.borderGrey),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.03),
-            blurRadius: 8,
-            offset: const Offset(0, 2),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Text(
-            'Status History',
-            style: TextStyle(
-              color: AppColors.textDark,
-              fontSize: 14,
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-          const SizedBox(height: 16),
+        if (snapshot.hasError) {
+          return Center(
+            child: Text('Error loading history: ${snapshot.error}', style: const TextStyle(color: Colors.red)),
+          );
+        }
 
-          ...List.generate(history.length, (index) {
-            final entry = history[index];
-            final isLast = index == history.length - 1;
-            return _buildTimelineEntry(entry, isLast: isLast);
-          }),
-        ],
-      ),
+        final history = snapshot.data ?? [];
+
+        return Container(
+          width: double.infinity,
+          padding: const EdgeInsets.all(18),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(color: AppColors.borderGrey),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.03),
+                blurRadius: 8,
+                offset: const Offset(0, 2),
+              ),
+            ],
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                'Status History',
+                style: TextStyle(
+                  color: AppColors.textDark,
+                  fontSize: 14,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+              const SizedBox(height: 16),
+
+              if (history.isEmpty)
+                const Text('No status history available.', style: TextStyle(color: AppColors.textGrey, fontSize: 13))
+              else
+                ...List.generate(history.length, (index) {
+                  final entry = history[index];
+                  final isLast = index == history.length - 1;
+                  return _buildTimelineEntry(entry, isLast: isLast);
+                }),
+            ],
+          ),
+        );
+      },
     );
   }
 
   Widget _buildTimelineEntry(
-    ComplaintStatusEntry entry, {
+    IssueStatusHistoryModel entry, {
     required bool isLast,
   }) {
-    final config = _timelineConfig(entry.status);
+    final config = _timelineConfig(entry.newStatus);
 
     final date =
-        '${entry.timestamp.day.toString().padLeft(2, '0')}/'
-        '${entry.timestamp.month.toString().padLeft(2, '0')}/'
-        '${entry.timestamp.year}';
+        '${entry.changedAt.day.toString().padLeft(2, '0')}/'
+        '${entry.changedAt.month.toString().padLeft(2, '0')}/'
+        '${entry.changedAt.year}';
 
-    final hour = entry.timestamp.hour;
-    final minute = entry.timestamp.minute.toString().padLeft(2, '0');
+    final hour = entry.changedAt.hour;
+    final minute = entry.changedAt.minute.toString().padLeft(2, '0');
     final period = hour >= 12 ? 'PM' : 'AM';
     final hour12 = hour == 0 ? 12 : (hour > 12 ? hour - 12 : hour);
     final time = '$hour12:$minute $period';
@@ -355,7 +400,7 @@ class ComplaintDetailScreen extends StatelessWidget {
                 children: [
                   const SizedBox(height: 5),
                   Text(
-                    entry.status.toUpperCase(),
+                    entry.newStatus.toUpperCase(),
                     style: TextStyle(
                       color: config.dotColor,
                       fontSize: 12,
@@ -373,7 +418,7 @@ class ComplaintDetailScreen extends StatelessWidget {
                   ),
                   const SizedBox(height: 4),
                   Text(
-                    entry.note,
+                    entry.displayNote,
                     style: const TextStyle(
                       color: AppColors.textDark,
                       fontSize: 13,

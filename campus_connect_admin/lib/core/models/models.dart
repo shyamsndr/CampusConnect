@@ -114,11 +114,11 @@ class ComplaintModel {
   final String id;
   final String title;
   final String description;
-  final String submittedBy;
+  final String submittedBy; // we'll store primary_reporter_id here or their name if joined
   final String submittedByRole;
   final String location;
   final String priority; // 'Low', 'Medium', 'High'
-  final String status; // 'Open', 'In Progress', 'Closed'  (was: Pending/In Progress/Resolved)
+  final String status; // 'Open', 'In Progress', 'Closed'
   final DateTime reportedAt;
   final String? photoUrl;
   final List<AffectedUser> affectedUsers;
@@ -138,6 +138,31 @@ class ComplaintModel {
     this.affectedUsers = const [],
     this.statusHistory = const [],
   });
+
+  factory ComplaintModel.fromFirestore(DocumentSnapshot doc) {
+    final data = doc.data() as Map<String, dynamic>? ?? {};
+    final now = DateTime.now();
+
+    DateTime parseTimestamp(dynamic raw) {
+      if (raw is Timestamp) return raw.toDate();
+      return now;
+    }
+
+    return ComplaintModel(
+      id: doc.id,
+      title: (data['title'] as String?)?.trim() ?? '',
+      description: (data['description'] as String?)?.trim() ?? '',
+      submittedBy: (data['primary_reporter_id'] as String?) ?? '',
+      submittedByRole: '', // We will resolve this separately if needed
+      location: (data['location'] as String?)?.trim() ?? '',
+      priority: (data['priority'] as String?)?.trim() ?? 'Medium',
+      status: (data['status'] as String?)?.trim() ?? 'Open',
+      reportedAt: parseTimestamp(data['created_at']),
+      photoUrl: data['primary_image_url'] as String?,
+      affectedUsers: [],
+      statusHistory: [],
+    );
+  }
 
   ComplaintModel copyWith({
     String? id,

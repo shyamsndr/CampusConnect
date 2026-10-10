@@ -1,33 +1,37 @@
 import 'package:flutter/material.dart';
 import '../../core/constants/app_colors.dart';
-import '../../core/models/complaint_model.dart';
-import '../../core/services/mock_complaint_data.dart';
+import '../../core/models/issue_model.dart';
+import '../../core/services/auth_service.dart';
+import '../../core/services/complaint_service.dart';
 import '../../widgets/complaints/complaint_card.dart';
 import 'complaint_detail_screen.dart';
 
 /// Displays the current user's submitted complaints.
 /// Supports filtering by status: All | Open | In Progress | Closed.
-///
-/// Phase 0 — uses static mock data only.
 class MyComplaintsScreen extends StatefulWidget {
-  const MyComplaintsScreen({super.key});
+  final AuthService authService;
+  
+  const MyComplaintsScreen({super.key, required this.authService});
 
   @override
   State<MyComplaintsScreen> createState() => _MyComplaintsScreenState();
 }
 
 class _MyComplaintsScreenState extends State<MyComplaintsScreen> {
+  final ComplaintService _complaintService = ComplaintService();
   final List<String> _filters = ['All', 'Open', 'In Progress', 'Closed'];
   String _selectedFilter = 'All';
 
-  List<ComplaintModel> get _filteredComplaints {
-    final all = MockComplaintData.complaints;
+  List<IssueModel> _filterComplaints(List<IssueModel> all) {
     if (_selectedFilter == 'All') return all;
     return all.where((c) => c.status == _selectedFilter).toList();
   }
 
   @override
   Widget build(BuildContext context) {
+    final user = widget.authService.currentUser;
+    final uid = user?.uid ?? '';
+
     return Scaffold(
       backgroundColor: AppColors.background,
       appBar: AppBar(
@@ -43,26 +47,6 @@ class _MyComplaintsScreenState extends State<MyComplaintsScreen> {
             fontWeight: FontWeight.w700,
           ),
         ),
-        actions: [
-          Padding(
-            padding: const EdgeInsets.only(right: 16),
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-              decoration: BoxDecoration(
-                color: AppColors.primaryBlue.withValues(alpha: 0.09),
-                borderRadius: BorderRadius.circular(20),
-              ),
-              child: Text(
-                '${MockComplaintData.complaints.length} Total',
-                style: const TextStyle(
-                  color: AppColors.primaryBlue,
-                  fontSize: 12,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-            ),
-          ),
-        ],
       ),
       body: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -71,7 +55,27 @@ class _MyComplaintsScreenState extends State<MyComplaintsScreen> {
           _buildFilterTabs(),
 
           // ── Complaint List ────────────────────────────────────────
-          Expanded(child: _buildComplaintList()),
+          Expanded(
+            child: StreamBuilder<List<IssueModel>>(
+              stream: _complaintService.getUserComplaintsStream(uid),
+              builder: (context, snapshot) {
+                if (snapshot.connectionState == ConnectionState.waiting) {
+                  return const Center(child: CircularProgressIndicator());
+                }
+
+                if (snapshot.hasError) {
+                  return Center(
+                    child: Text('Error: ${snapshot.error}', style: const TextStyle(color: Colors.red)),
+                  );
+                }
+
+                final complaints = snapshot.data ?? [];
+                final filtered = _filterComplaints(complaints);
+
+                return _buildComplaintList(filtered);
+              },
+            ),
+          ),
         ],
       ),
     );
@@ -142,9 +146,7 @@ class _MyComplaintsScreenState extends State<MyComplaintsScreen> {
     );
   }
 
-  Widget _buildComplaintList() {
-    final complaints = _filteredComplaints;
-
+  Widget _buildComplaintList(List<IssueModel> complaints) {
     if (complaints.isEmpty) {
       return Center(
         child: Column(
@@ -193,3 +195,4 @@ class _MyComplaintsScreenState extends State<MyComplaintsScreen> {
     );
   }
 }
+

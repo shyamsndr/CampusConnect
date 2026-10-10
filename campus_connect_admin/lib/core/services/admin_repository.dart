@@ -94,9 +94,10 @@ class AdminRepository extends ChangeNotifier {
 
       _isAuthenticated = true;
 
-      // Start listening to USERS & EVENTS collections once admin session is confirmed.
+      // Start listening to USERS, EVENTS, & ISSUES collections once admin session is confirmed.
       subscribeToUsers();
       subscribeToEvents();
+      subscribeToComplaints();
     } catch (_) {
       // If session restoration fails, keep the user logged out.
       _isAuthenticated = false;
@@ -154,9 +155,10 @@ class AdminRepository extends ChangeNotifier {
 
       notifyListeners();
 
-      // Start listening to USERS & EVENTS collections once admin is authenticated.
+      // Start listening to USERS, EVENTS, & ISSUES collections once admin is authenticated.
       subscribeToUsers();
       subscribeToEvents();
+      subscribeToComplaints();
 
       return null;
     } on FirebaseAuthException catch (e) {
@@ -193,6 +195,7 @@ class AdminRepository extends ChangeNotifier {
   Future<void> logout() async {
     _cancelUsersSubscription();
     _cancelEventsSubscription();
+    _cancelComplaintsSubscription();
     await _auth.signOut();
 
     _isAuthenticated = false;
@@ -203,6 +206,7 @@ class AdminRepository extends ChangeNotifier {
     // Clear user and event state on logout.
     _users.clear();
     _events.clear();
+    _complaints.clear();
     _isLoadingUsers = false;
     _usersError = null;
 
@@ -279,175 +283,172 @@ class AdminRepository extends ChangeNotifier {
   // ONE ROW = ONE ISSUE (possibly multiple reporters)
   // ============================================================
 
-  final List<ComplaintModel> _complaints = [
-    ComplaintModel(
-      id: 'ISS-2026-001',
-      title: 'Fan not working',
-      description:
-          'The ceiling fan in F06 classroom has stopped working completely. Multiple students and the class teacher have reported discomfort due to extreme heat during lectures.',
-      submittedBy: 'Rahul S',
-      submittedByRole: 'Student',
-      location: 'F06 Classroom',
-      priority: 'High',
-      status: 'Open',
-      reportedAt: DateTime(2026, 10, 4, 10, 30),
-      affectedUsers: [
-        AffectedUser(name: 'Rahul S', memberCode: 'MCA001', type: 'Student', department: 'MCA', reportTitle: 'Fan not working', reportDescription: 'The fan in F06 classroom is not turning on.', reportDate: DateTime(2026, 10, 4, 10, 30), photoUrl: 'Photo A'),
-        AffectedUser(name: 'Anjali P', memberCode: 'MCA014', type: 'Student', department: 'MCA', reportTitle: 'Classroom fan problem', reportDescription: 'The ceiling fan near the last bench is not working.', reportDate: DateTime(2026, 10, 4, 10, 42), photoUrl: 'Photo B'),
-        AffectedUser(name: 'Sreenath K', memberCode: 'MBA021', type: 'Student', department: 'MBA', reportTitle: 'No air circulation', reportDescription: 'One of the fans in F06 has stopped working.', reportDate: DateTime(2026, 10, 4, 11, 05), photoUrl: 'Photo C'),
-        AffectedUser(name: 'Staff 1', memberCode: 'ST004', type: 'Staff', department: 'Maintenance', reportTitle: 'F06 Fan replacement needed', reportDescription: 'Confirmed fan motor is burnt.', reportDate: DateTime(2026, 10, 4, 11, 30)),
-        AffectedUser(name: 'Divya R', memberCode: 'MCA032', type: 'Student', department: 'MCA', reportTitle: 'Fan issue F06', reportDescription: 'Too hot in class', reportDate: DateTime(2026, 10, 4, 12, 00)),
-      ],
-      statusHistory: [
-        AdminComplaintStatusEntry(
-          status: 'Open',
-          timestamp: DateTime(2026, 10, 4, 10, 30),
-          note: 'Complaint submitted',
-        ),
-      ],
-    ),
-    ComplaintModel(
-      id: 'ISS-2026-002',
-      title: 'Water leakage near staircase',
-      description:
-          'Continuous water dripping from overhead pipe near the Block A staircase. Floor is wet and poses a safety hazard. Reported by multiple students.',
-      submittedBy: 'Meera K',
-      submittedByRole: 'Student',
-      location: 'Block A',
-      priority: 'Medium',
-      status: 'In Progress',
-      reportedAt: DateTime(2026, 9, 28, 9, 15),
-      affectedUsers: [
-        AffectedUser(name: 'Meera K', memberCode: 'BCA008', type: 'Student', department: 'BCA', reportTitle: 'Leakage', reportDescription: 'Water leaking.', reportDate: DateTime(2026, 9, 28, 9, 15)),
-        AffectedUser(name: 'Arjun T', memberCode: 'BCA012', type: 'Student', department: 'BCA', reportTitle: 'Pipe break', reportDescription: 'Pipe broken.', reportDate: DateTime(2026, 9, 28, 9, 20)),
-      ],
-      statusHistory: [
-        AdminComplaintStatusEntry(
-          status: 'Open',
-          timestamp: DateTime(2026, 9, 28, 9, 15),
-          note: 'Complaint submitted',
-        ),
-        AdminComplaintStatusEntry(
-          status: 'In Progress',
-          timestamp: DateTime(2026, 9, 30, 11, 20),
-          note: 'Work started by maintenance team',
-        ),
-      ],
-    ),
-    ComplaintModel(
-      id: 'ISS-2026-003',
-      title: 'AC not working in Computer Lab',
-      description:
-          'The air conditioning unit in the Computer Lab is not cooling. Temperature is rising, causing discomfort and equipment heat issues during lab sessions.',
-      submittedBy: 'Dr. Vikram J',
-      submittedByRole: 'Staff',
-      location: 'Computer Lab',
-      priority: 'High',
-      status: 'Open',
-      reportedAt: DateTime(2026, 10, 2, 8, 0),
-      affectedUsers: [
-        AffectedUser(name: 'Dr. Vikram J', memberCode: 'ST003', type: 'Staff', department: 'CS', reportTitle: 'AC issue', reportDescription: 'AC is not working.', reportDate: DateTime(2026, 10, 2, 8, 0)),
-        AffectedUser(name: 'Priya M', memberCode: 'MCA007', type: 'Student', department: 'MCA', reportTitle: 'Hot lab', reportDescription: 'Lab is hot.', reportDate: DateTime(2026, 10, 2, 8, 30)),
-        AffectedUser(name: 'Karan R', memberCode: 'MCA019', type: 'Student', department: 'MCA', reportTitle: 'AC', reportDescription: 'Fix AC please.', reportDate: DateTime(2026, 10, 2, 9, 0)),
-      ],
-      statusHistory: [
-        AdminComplaintStatusEntry(
-          status: 'Open',
-          timestamp: DateTime(2026, 10, 2, 8, 0),
-          note: 'Complaint submitted',
-        ),
-      ],
-    ),
-    ComplaintModel(
-      id: 'ISS-2026-004',
-      title: 'Projector not working in Seminar Hall',
-      description:
-          'The ceiling-mounted projector in Seminar Hall B turns off intermittently every 10 minutes. This is disrupting guest lectures and presentations.',
-      submittedBy: 'Prof. Ananya S',
-      submittedByRole: 'Staff',
-      location: 'Seminar Hall B',
-      priority: 'Medium',
-      status: 'Open',
-      reportedAt: DateTime(2026, 9, 12, 14, 15),
-      affectedUsers: [
-        AffectedUser(name: 'Prof. Ananya S', memberCode: 'ST007', type: 'Staff', department: 'MBA', reportTitle: 'Projector', reportDescription: 'Projector is off.', reportDate: DateTime(2026, 9, 12, 14, 15)),
-        AffectedUser(name: 'Rohan V', memberCode: 'MBA003', type: 'Student', department: 'MBA', reportTitle: 'No display', reportDescription: 'Display off.', reportDate: DateTime(2026, 9, 12, 14, 20)),
-      ],
-      statusHistory: [
-        AdminComplaintStatusEntry(
-          status: 'Open',
-          timestamp: DateTime(2026, 9, 12, 14, 15),
-          note: 'Complaint submitted',
-        ),
-      ],
-    ),
-    // ── CLOSED ISSUES ──────────────────────────────────────────────────────
-    ComplaintModel(
-      id: 'ISS-2026-005',
-      title: 'Light not working in Library',
-      description:
-          'Two tube lights in the library reading area on the 1st floor are not functioning. Poor lighting is affecting student study sessions significantly.',
-      submittedBy: 'Priya Sundaram',
-      submittedByRole: 'Student',
-      location: 'Central Library, 1st Floor',
-      priority: 'Low',
-      status: 'Closed',
-      reportedAt: DateTime(2026, 9, 20, 14, 45),
-      affectedUsers: [
-        AffectedUser(name: 'Priya Sundaram', memberCode: 'BCA022', type: 'Student', department: 'BCA', reportTitle: 'Light off', reportDescription: 'Light is off.', reportDate: DateTime(2026, 9, 20, 14, 45)),
-      ],
-      statusHistory: [
-        AdminComplaintStatusEntry(
-          status: 'Open',
-          timestamp: DateTime(2026, 9, 20, 14, 45),
-          note: 'Complaint submitted',
-        ),
-        AdminComplaintStatusEntry(
-          status: 'In Progress',
-          timestamp: DateTime(2026, 9, 22, 10, 0),
-          note: 'Electrician assigned and work in progress',
-        ),
-        AdminComplaintStatusEntry(
-          status: 'Closed',
-          timestamp: DateTime(2026, 9, 23, 16, 30),
-          note: 'Lights replaced and issue resolved',
-        ),
-      ],
-    ),
-    ComplaintModel(
-      id: 'ISS-2026-006',
-      title: 'Cafeteria water dispenser filter clogged',
-      description:
-          'Water flow rate from the dispenser in the cafeteria is extremely low. The filter cartridge requires replacement immediately.',
-      submittedBy: 'Aarav Patel',
-      submittedByRole: 'Student',
-      location: 'Student Activity Center, Cafeteria',
-      priority: 'Low',
-      status: 'Closed',
-      reportedAt: DateTime(2026, 9, 8, 13, 20),
-      affectedUsers: [
-        AffectedUser(name: 'Aarav Patel', memberCode: 'MBA009', type: 'Student', department: 'MBA', reportTitle: 'Filter', reportDescription: 'Filter clogged.', reportDate: DateTime(2026, 9, 8, 13, 20)),
-        AffectedUser(name: 'Sneha L', memberCode: 'BCA031', type: 'Student', department: 'BCA', reportTitle: 'Water flow', reportDescription: 'Low water flow.', reportDate: DateTime(2026, 9, 8, 13, 25)),
-      ],
-      statusHistory: [
-        AdminComplaintStatusEntry(
-          status: 'Open',
-          timestamp: DateTime(2026, 9, 8, 13, 20),
-          note: 'Complaint submitted',
-        ),
-        AdminComplaintStatusEntry(
-          status: 'In Progress',
-          timestamp: DateTime(2026, 9, 9, 9, 0),
-          note: 'Maintenance team scheduled for replacement',
-        ),
-        AdminComplaintStatusEntry(
-          status: 'Closed',
-          timestamp: DateTime(2026, 9, 10, 11, 45),
-          note: 'Filter cartridge replaced and dispenser restored',
-        ),
-      ],
-    ),
-  ];
+  final List<ComplaintModel> _complaints = [];
+  bool _isLoadingComplaints = false;
+  String? _complaintsError;
+  StreamSubscription<QuerySnapshot<Map<String, dynamic>>>? _complaintsSubscription;
+
+  bool get isLoadingComplaints => _isLoadingComplaints;
+  String? get complaintsError => _complaintsError;
+
+  void subscribeToComplaints() {
+    _cancelComplaintsSubscription();
+
+    _isLoadingComplaints = true;
+    _complaintsError = null;
+    notifyListeners();
+
+    _complaintsSubscription = _firestore
+        .collection('ISSUES')
+        .orderBy('created_at', descending: true)
+        .snapshots()
+        .listen(
+          (snapshot) {
+            final loaded = <ComplaintModel>[];
+
+            for (final doc in snapshot.docs) {
+              try {
+                loaded.add(ComplaintModel.fromFirestore(doc));
+              } catch (e) {
+                debugPrint(
+                  '[AdminRepository] Skipped malformed ISSUES doc ${doc.id}: $e',
+                );
+              }
+            }
+
+            _complaints
+              ..clear()
+              ..addAll(loaded);
+
+            _isLoadingComplaints = false;
+            _complaintsError = null;
+            notifyListeners();
+          },
+          onError: (Object error) {
+            debugPrint('[AdminRepository] ISSUES snapshot error: $error');
+            _isLoadingComplaints = false;
+            _complaintsError =
+                'Unable to load complaints. Please check your connection.';
+            notifyListeners();
+          },
+        );
+  }
+
+  void _cancelComplaintsSubscription() {
+    _complaintsSubscription?.cancel();
+    _complaintsSubscription = null;
+  }
+
+  /// Fetches status history for a specific issue
+  Stream<List<AdminComplaintStatusEntry>> getComplaintStatusHistory(String issueId) {
+    return _firestore
+        .collection('ISSUE_STATUS_HISTORY')
+        .where('issue_id', isEqualTo: issueId)
+        .orderBy('changed_at', descending: true)
+        .snapshots()
+        .map((snapshot) => snapshot.docs.map((doc) {
+              final data = doc.data();
+              DateTime timestamp = DateTime.now();
+              if (data['changed_at'] is Timestamp) {
+                timestamp = (data['changed_at'] as Timestamp).toDate();
+              }
+              final newStatus = data['new_status'] as String? ?? 'Open';
+              final oldStatus = data['old_status'] as String?;
+              final note = oldStatus == null ? 'Complaint submitted' : 'Status changed to $newStatus';
+              return AdminComplaintStatusEntry(
+                status: newStatus,
+                timestamp: timestamp,
+                note: note,
+              );
+            }).toList());
+  }
+
+  /// Fetches affected users (ISSUE_REPORTS joined with USERS) for a specific issue
+  Stream<List<AffectedUser>> getAffectedUsers(String issueId) async* {
+    final reportsStream = _firestore
+        .collection('ISSUE_REPORTS')
+        .where('issue_id', isEqualTo: issueId)
+        .orderBy('created_at', descending: true)
+        .snapshots();
+
+    await for (final snapshot in reportsStream) {
+      final List<AffectedUser> users = [];
+      for (final doc in snapshot.docs) {
+        final data = doc.data();
+        final userId = data['user_id'] as String?;
+        if (userId == null) continue;
+
+        // Fetch user data
+        final userDoc = await _firestore.collection('USERS').doc(userId).get();
+        final userData = userDoc.data() ?? {};
+
+        DateTime reportDate = DateTime.now();
+        if (data['created_at'] is Timestamp) {
+          reportDate = (data['created_at'] as Timestamp).toDate();
+        }
+
+        users.add(AffectedUser(
+          name: (userData['name'] as String?) ?? 'Unknown',
+          memberCode: (userData['member_code'] as String?) ?? '-',
+          type: (userData['role'] as String?) ?? 'Student',
+          department: (userData['department'] as String?) ?? '',
+          reportTitle: (data['title'] as String?) ?? '',
+          reportDescription: (data['description'] as String?) ?? '',
+          reportDate: reportDate,
+          photoUrl: data['image_url'] as String?,
+        ));
+      }
+      yield users;
+    }
+  }
+
+  // ============================================================
+  // COMPLAINT ACTIONS
+  // ============================================================
+
+  ComplaintModel? getComplaintById(String id) {
+    try {
+      return _complaints.firstWhere((c) => c.id == id);
+    } catch (_) {
+      return null;
+    }
+  }
+
+  Future<void> updateComplaintStatus(String id, String newStatus) async {
+    final complaint = getComplaintById(id);
+    if (complaint == null) return;
+
+    final oldStatus = complaint.status;
+    if (oldStatus == newStatus) return;
+
+    // Prevent reopening a Closed complaint.
+    if (oldStatus == 'Closed') return;
+
+    try {
+      final changedBy = _auth.currentUser?.uid ?? 'unknown';
+
+      final batch = _firestore.batch();
+
+      // Update ISSUES document with new status.
+      final issueRef = _firestore.collection('ISSUES').doc(id);
+      batch.update(issueRef, {'status': newStatus});
+
+      // Record the status change in ISSUE_STATUS_HISTORY.
+      final historyRef = _firestore.collection('ISSUE_STATUS_HISTORY').doc();
+      batch.set(historyRef, {
+        'history_id': historyRef.id,
+        'issue_id': id,
+        'old_status': oldStatus,
+        'new_status': newStatus,
+        'changed_by': changedBy,
+        'changed_at': FieldValue.serverTimestamp(),
+      });
+
+      await batch.commit();
+    } catch (e) {
+      debugPrint('[AdminRepository] Failed to update complaint status: $e');
+    }
+  }
 
   // ============================================================
   // GETTERS & DASHBOARD METRICS
@@ -560,28 +561,6 @@ class AdminRepository extends ChangeNotifier {
   }
 
   // ============================================================
-  // COMPLAINT ACTIONS
-  // ============================================================
-
-  ComplaintModel? getComplaintById(String id) {
-    try {
-      return _complaints.firstWhere((c) => c.id == id);
-    } catch (_) {
-      return null;
-    }
-  }
-
-  void updateComplaintStatus(String id, String newStatus) {
-    final index = _complaints.indexWhere((c) => c.id == id);
-
-    if (index != -1) {
-      _complaints[index] = _complaints[index].copyWith(status: newStatus);
-
-      notifyListeners();
-    }
-  }
-
-  // ============================================================
   // EVENTS — FIRESTORE REALTIME STATE
   // ============================================================
 
@@ -647,6 +626,7 @@ class AdminRepository extends ChangeNotifier {
   void dispose() {
     _cancelUsersSubscription();
     _cancelEventsSubscription();
+    _cancelComplaintsSubscription();
     super.dispose();
   }
 

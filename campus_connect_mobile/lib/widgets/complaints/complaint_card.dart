@@ -1,11 +1,11 @@
 import 'package:flutter/material.dart';
 import '../../core/constants/app_colors.dart';
-import '../../core/models/complaint_model.dart';
+import '../../core/models/issue_model.dart';
 import 'status_chip.dart';
 
 /// Clean, scannable complaint card for My Complaints list.
 class ComplaintCard extends StatelessWidget {
-  final ComplaintModel complaint;
+  final IssueModel complaint;
   final VoidCallback onTap;
 
   const ComplaintCard({super.key, required this.complaint, required this.onTap});
@@ -43,11 +43,23 @@ class ComplaintCard extends StatelessWidget {
                 width: 72,
                 height: 86,
                 color: AppColors.borderGrey,
-                child: Icon(
-                  Icons.report_problem_outlined,
-                  color: AppColors.primaryBlue.withValues(alpha: 0.5),
-                  size: 28,
-                ),
+                child: complaint.primaryImageUrl != null
+                    ? Image.network(
+                        complaint.primaryImageUrl!,
+                        fit: BoxFit.cover,
+                        errorBuilder: (context, error, stackTrace) {
+                          return Icon(
+                            Icons.report_problem_outlined,
+                            color: AppColors.primaryBlue.withValues(alpha: 0.5),
+                            size: 28,
+                          );
+                        },
+                      )
+                    : Icon(
+                        Icons.report_problem_outlined,
+                        color: AppColors.primaryBlue.withValues(alpha: 0.5),
+                        size: 28,
+                      ),
               ),
             ),
 

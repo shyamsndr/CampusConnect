@@ -3,20 +3,21 @@ import '../../core/constants/app_colors.dart';
 import '../../core/models/models.dart';
 import '../../core/services/admin_repository.dart';
 import '../../widgets/common/status_badge.dart';
-import 'affected_users_screen.dart';
 
 /// Full screen detail view for a specific complaint from the admin side.
-/// Phase 0 — includes Affected Users and Status History. Uses static mock data.
+/// Phase 1 — connected to real Firestore data via AdminRepository streams.
 class ComplaintDetailsScreen extends StatefulWidget {
   final ComplaintModel complaint;
   final AdminRepository repository;
   final VoidCallback onBack;
+  final void Function(List<AffectedUser>, String) onViewAffectedUsers;
 
   const ComplaintDetailsScreen({
     super.key,
     required this.complaint,
     required this.repository,
     required this.onBack,
+    required this.onViewAffectedUsers,
   });
 
   @override
@@ -24,20 +25,10 @@ class ComplaintDetailsScreen extends StatefulWidget {
 }
 
 class _ComplaintDetailsScreenState extends State<ComplaintDetailsScreen> {
-  late String _currentStatus;
-
-  @override
-  void initState() {
-    super.initState();
-    _currentStatus = widget.complaint.status;
-  }
-
-  void _handleStatusChange(String newStatus) {
-    if (_currentStatus == newStatus) return;
-
-    setState(() {
-      _currentStatus = newStatus;
-    });
+  void _handleStatusChange(String currentStatus, String newStatus) {
+    if (currentStatus == newStatus) return;
+    // Guard: do not allow reopening a Closed complaint.
+    if (currentStatus == 'Closed') return;
 
     widget.repository.updateComplaintStatus(widget.complaint.id, newStatus);
 
@@ -51,10 +42,69 @@ class _ComplaintDetailsScreenState extends State<ComplaintDetailsScreen> {
     );
   }
 
+  void _showImageOverlay(BuildContext context, String imageUrl) {
+    showDialog(
+      context: context,
+      useSafeArea: false,
+      builder: (context) {
+        return Scaffold(
+          backgroundColor: Colors.black.withValues(alpha: 0.9),
+          body: Stack(
+            children: [
+              Positioned.fill(
+                child: InteractiveViewer(
+                  minScale: 1.0,
+                  maxScale: 4.0,
+                  child: Image.network(
+                    imageUrl,
+                    fit: BoxFit.contain,
+                    errorBuilder: (context, error, stackTrace) => const Center(
+                      child: Icon(Icons.broken_image, color: Colors.white54, size: 48),
+                    ),
+                    loadingBuilder: (context, child, loadingProgress) {
+                      if (loadingProgress == null) return child;
+                      return const Center(
+                        child: CircularProgressIndicator(color: Colors.white),
+                      );
+                    },
+                  ),
+                ),
+              ),
+              Positioned(
+                top: 24,
+                right: 24,
+                child: IconButton(
+                  icon: const Icon(Icons.close, color: Colors.white, size: 32),
+                  onPressed: () => Navigator.of(context).pop(),
+                  tooltip: 'Close',
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
-    // Re-fetch in case status was updated
-    final complaint = widget.repository.getComplaintById(widget.complaint.id) ?? widget.complaint;
+    // Always use the latest data from the in-memory repository snapshot
+    // (kept up to date by the ISSUES realtime stream) so status changes
+    // are reflected immediately without any local state.
+    final complaint =
+        widget.repository.getComplaintById(widget.complaint.id) ??
+        widget.complaint;
+    final currentStatus = complaint.status;
+
+    UserModel? reporter;
+    try {
+      reporter = widget.repository.users.firstWhere((u) => u.uid == complaint.submittedBy);
+    } catch (_) {}
+
+    final reporterName = reporter?.name ?? complaint.submittedBy;
+    final reporterRole = reporter != null && reporter.memberCode.isNotEmpty
+        ? '${reporter.role} - ${reporter.memberCode}'
+        : complaint.submittedByRole;
 
     return SingleChildScrollView(
       padding: const EdgeInsets.all(24),
@@ -120,7 +170,7 @@ class _ComplaintDetailsScreenState extends State<ComplaintDetailsScreen> {
                         _buildMetaItem(
                           icon: Icons.person_outline,
                           label: 'Primary Reporter',
-                          value: '${complaint.submittedBy} (${complaint.submittedByRole})',
+                          value: '$reporterName${reporterRole.isNotEmpty ? ' ($reporterRole)' : ''}',
                         ),
                         _buildMetaItem(
                           icon: Icons.location_on_outlined,
@@ -176,7 +226,18 @@ class _ComplaintDetailsScreenState extends State<ComplaintDetailsScreen> {
                       ),
                     ),
                     const SizedBox(height: 12),
-                    _buildAffectedUsersCompact(complaint.affectedUsers),
+                    StreamBuilder<List<AffectedUser>>(
+                      stream: widget.repository.getAffectedUsers(complaint.id),
+                      builder: (context, snapshot) {
+                        if (snapshot.connectionState == ConnectionState.waiting) {
+                          return const Center(child: CircularProgressIndicator());
+                        }
+                        if (snapshot.hasError) {
+                          return Text('Error: ${snapshot.error}', style: const TextStyle(color: Colors.red));
+                        }
+                        return _buildAffectedUsersCompact(snapshot.data ?? [], complaint.id);
+                      },
+                    ),
 
                     const SizedBox(height: 32),
 
@@ -190,40 +251,22 @@ class _ComplaintDetailsScreenState extends State<ComplaintDetailsScreen> {
                       ),
                     ),
                     const SizedBox(height: 12),
-                    Container(
-                      height: 160,
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFF9FBFE),
-                        borderRadius: BorderRadius.circular(6),
-                        border: Border.all(
-                          color: AppColors.border,
-                          style: BorderStyle.solid,
+                    if (complaint.photoUrl != null)
+                      InkWell(
+                        onTap: () => _showImageOverlay(context, complaint.photoUrl!.replaceAll('10.0.2.2', '127.0.0.1')),
+                        child: ClipRRect(
+                          borderRadius: BorderRadius.circular(6),
+                          child: Image.network(
+                            complaint.photoUrl!.replaceAll('10.0.2.2', '127.0.0.1'),
+                            height: 220,
+                            width: double.infinity,
+                            fit: BoxFit.cover,
+                            errorBuilder: (context, error, stackTrace) => _buildNoPhotoPlaceholder(),
+                          ),
                         ),
-                      ),
-                      alignment: Alignment.center,
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Icon(
-                            complaint.photoUrl != null
-                                ? Icons.image
-                                : Icons.image_not_supported_outlined,
-                            size: 42,
-                            color: AppColors.textLight,
-                          ),
-                          const SizedBox(height: 12),
-                          Text(
-                            complaint.photoUrl != null
-                                ? 'Photo attached: ${complaint.photoUrl}'
-                                : 'No photo was attached for this issue.',
-                            style: const TextStyle(
-                              fontSize: 14,
-                              color: AppColors.textGrey,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
+                      )
+                    else
+                      _buildNoPhotoPlaceholder(),
 
                     const SizedBox(height: 32),
                     const Divider(height: 1),
@@ -239,7 +282,18 @@ class _ComplaintDetailsScreenState extends State<ComplaintDetailsScreen> {
                       ),
                     ),
                     const SizedBox(height: 16),
-                    _buildStatusTimeline(complaint.statusHistory),
+                    StreamBuilder<List<AdminComplaintStatusEntry>>(
+                      stream: widget.repository.getComplaintStatusHistory(complaint.id),
+                      builder: (context, snapshot) {
+                        if (snapshot.connectionState == ConnectionState.waiting) {
+                          return const Center(child: CircularProgressIndicator());
+                        }
+                        if (snapshot.hasError) {
+                          return Text('Error: ${snapshot.error}', style: const TextStyle(color: Colors.red));
+                        }
+                        return _buildStatusTimeline(snapshot.data ?? []);
+                      },
+                    ),
 
                     const SizedBox(height: 32),
                     const Divider(height: 1),
@@ -266,23 +320,23 @@ class _ComplaintDetailsScreenState extends State<ComplaintDetailsScreen> {
                       runSpacing: 10,
                       children: [
                         _buildStatusOptionButton(
+                          currentStatus: currentStatus,
                           status: 'Open',
                           icon: Icons.hourglass_top_outlined,
-                          isSelected: _currentStatus == 'Open',
                           activeColor: const Color(0xFFB45309),
                           activeBg: const Color(0xFFFEF3C7),
                         ),
                         _buildStatusOptionButton(
+                          currentStatus: currentStatus,
                           status: 'In Progress',
                           icon: Icons.engineering_outlined,
-                          isSelected: _currentStatus == 'In Progress',
                           activeColor: AppColors.statusInProgressText,
                           activeBg: AppColors.statusInProgressBg,
                         ),
                         _buildStatusOptionButton(
+                          currentStatus: currentStatus,
                           status: 'Closed',
                           icon: Icons.check_circle_outline,
-                          isSelected: _currentStatus == 'Closed',
                           activeColor: AppColors.statusResolvedText,
                           activeBg: AppColors.statusResolvedBg,
                         ),
@@ -335,7 +389,7 @@ class _ComplaintDetailsScreenState extends State<ComplaintDetailsScreen> {
     );
   }
 
-  Widget _buildAffectedUsersCompact(List<AffectedUser> users) {
+  Widget _buildAffectedUsersCompact(List<AffectedUser> users, String complaintId) {
     if (users.isEmpty) {
       return const Text(
         'No additional users affected.',
@@ -370,13 +424,7 @@ class _ComplaintDetailsScreenState extends State<ComplaintDetailsScreen> {
           ],
         ),
         onTap: () {
-          Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (context) =>
-                  AffectedUsersScreen(affectedUsers: users, complaintId: widget.complaint.id),
-            ),
-          );
+          widget.onViewAffectedUsers(users, complaintId);
         },
       ),
       ),
@@ -490,46 +538,75 @@ class _ComplaintDetailsScreenState extends State<ComplaintDetailsScreen> {
     );
   }
 
+  Widget _buildNoPhotoPlaceholder() {
+    return Container(
+      height: 120,
+      decoration: BoxDecoration(
+        color: const Color(0xFFF9FBFE),
+        borderRadius: BorderRadius.circular(6),
+        border: Border.all(color: AppColors.border),
+      ),
+      alignment: Alignment.center,
+      child: const Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(
+            Icons.image_not_supported_outlined,
+            size: 36,
+            color: AppColors.textLight,
+          ),
+          SizedBox(height: 8),
+          Text(
+            'No photo was attached for this issue.',
+            style: TextStyle(fontSize: 13, color: AppColors.textGrey),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildStatusOptionButton({
+    required String currentStatus,
     required String status,
     required IconData icon,
-    required bool isSelected,
     required Color activeColor,
     required Color activeBg,
   }) {
+    final isSelected = currentStatus == status;
+    // Buttons are disabled when the complaint is already Closed.
+    final isClosed = currentStatus == 'Closed';
+    final effectiveColor = isClosed ? AppColors.textGrey : (isSelected ? activeColor : AppColors.textGrey);
+    final effectiveBg    = isClosed ? AppColors.surface  : (isSelected ? activeBg    : AppColors.surface);
+
     return InkWell(
-      onTap: () => _handleStatusChange(status),
+      onTap: isClosed ? null : () => _handleStatusChange(currentStatus, status),
       borderRadius: BorderRadius.circular(6),
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
         decoration: BoxDecoration(
-          color: isSelected ? activeBg : AppColors.surface,
+          color: effectiveBg,
           borderRadius: BorderRadius.circular(6),
           border: Border.all(
-            color: isSelected ? activeColor : AppColors.border,
-            width: isSelected ? 1.5 : 1,
+            color: isSelected && !isClosed ? activeColor : AppColors.border,
+            width: isSelected && !isClosed ? 1.5 : 1,
           ),
         ),
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(
-              icon,
-              size: 18,
-              color: isSelected ? activeColor : AppColors.textGrey,
-            ),
+            Icon(icon, size: 18, color: effectiveColor),
             const SizedBox(width: 8),
             Text(
               status,
               style: TextStyle(
                 fontSize: 13,
                 fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
-                color: isSelected ? activeColor : AppColors.textDark,
+                color: isClosed ? AppColors.textGrey : (isSelected ? activeColor : AppColors.textDark),
               ),
             ),
             if (isSelected) ...[
               const SizedBox(width: 8),
-              Icon(Icons.check, size: 16, color: activeColor),
+              Icon(Icons.check, size: 16, color: effectiveColor),
             ],
           ],
         ),
