@@ -33,3 +33,4 @@ export async function checkAuthEmailExists(email: string): Promise<boolean> {
     throw error;
   }
 }
+

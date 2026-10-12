@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:cloud_functions/cloud_functions.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
@@ -56,10 +57,26 @@ class AuthService extends ChangeNotifier {
       }
 
       await _loadUserProfile(user.uid);
+
+      // Do not restore a session without a valid, active profile.
+      if (_currentUser == null || _currentUser!.status != 'Active') {
+        await _auth.signOut();
+        _currentUser = null;
+        return;
+      }
+
       await _setupFCMToken();
     } catch (e) {
       debugPrint('[AuthService] Session restore failed: $e');
       _currentUser = null;
+
+      try {
+        await _auth.signOut();
+      } catch (signOutError) {
+        debugPrint(
+          '[AuthService] Sign-out after restore failure failed: $signOutError',
+        );
+      }
     } finally {
       _isInitializing = false;
       notifyListeners();
@@ -112,6 +129,25 @@ class AuthService extends ChangeNotifier {
 
       // Load the Firestore profile using the Firebase UID.
       await _loadUserProfile(firebaseUser.uid);
+
+      if (_currentUser == null) {
+        await _auth.signOut();
+        return 'Unable to load your account profile. Please contact the administrator.';
+      }
+
+      if (_currentUser!.status != 'Active') {
+        final status = _currentUser!.status;
+
+        await _auth.signOut();
+        _currentUser = null;
+        notifyListeners();
+        if (status == 'Inactive') {
+          return 'Your account is inactive. Please contact the administrator.';
+        }
+
+        return 'Your account is not active. Please contact the administrator.';
+      }
+
       await _setupFCMToken();
 
       notifyListeners();
@@ -141,10 +177,10 @@ class AuthService extends ChangeNotifier {
         debugPrint('[AuthService] Failed to clear FCM token on logout: $e');
       }
     }
-    
+
     _fcmTokenSubscription?.cancel();
     _fcmTokenSubscription = null;
-    
+
     await _auth.signOut();
     _currentUser = null;
     notifyListeners();
@@ -159,23 +195,20 @@ class AuthService extends ChangeNotifier {
 
     try {
       final messaging = FirebaseMessaging.instance;
-      
+
       // Request permission (Required for Android 13+ and iOS)
-      await messaging.requestPermission(
-        alert: true,
-        badge: true,
-        sound: true,
-      );
+      await messaging.requestPermission(alert: true, badge: true, sound: true);
 
       // Initialize local notifications for foreground display on Android
-      final flutterLocalNotificationsPlugin =
-          FlutterLocalNotificationsPlugin();
-      
-      const initializationSettingsAndroid =
-          AndroidInitializationSettings('@mipmap/ic_launcher');
-      const initializationSettings =
-          InitializationSettings(android: initializationSettingsAndroid);
-      
+      final flutterLocalNotificationsPlugin = FlutterLocalNotificationsPlugin();
+
+      const initializationSettingsAndroid = AndroidInitializationSettings(
+        '@mipmap/ic_launcher',
+      );
+      const initializationSettings = InitializationSettings(
+        android: initializationSettingsAndroid,
+      );
+
       await flutterLocalNotificationsPlugin.initialize(
         settings: initializationSettings,
       );
@@ -183,13 +216,15 @@ class AuthService extends ChangeNotifier {
       const androidNotificationChannel = AndroidNotificationChannel(
         'high_importance_channel', // id
         'High Importance Notifications', // title
-        description: 'This channel is used for important notifications.', // description
+        description:
+            'This channel is used for important notifications.', // description
         importance: Importance.max,
       );
 
       await flutterLocalNotificationsPlugin
           .resolvePlatformSpecificImplementation<
-              AndroidFlutterLocalNotificationsPlugin>()
+            AndroidFlutterLocalNotificationsPlugin
+          >()
           ?.createNotificationChannel(androidNotificationChannel);
 
       // Listen for foreground messages
@@ -222,7 +257,9 @@ class AuthService extends ChangeNotifier {
 
       // Listen for token refreshes
       _fcmTokenSubscription?.cancel();
-      _fcmTokenSubscription = messaging.onTokenRefresh.listen(_saveTokenToFirestore);
+      _fcmTokenSubscription = messaging.onTokenRefresh.listen(
+        _saveTokenToFirestore,
+      );
     } catch (e) {
       debugPrint('[AuthService] Failed to setup FCM: $e');
     }
@@ -258,20 +295,20 @@ class AuthService extends ChangeNotifier {
   /// Uses a targeted Firestore query — never downloads the full collection.
   Future<String?> _emailFromMemberCode(String memberCode) async {
     try {
-      final snapshot = await _firestore
-          .collection('USERS')
-          .where('member_code', isEqualTo: memberCode)
-          .limit(1)
-          .get();
+      final callable = FirebaseFunctions.instanceFor(
+        region: 'us-central1',
+      ).httpsCallable('lookupEmailByMemberCode');
 
-      if (snapshot.docs.isEmpty) return null;
-
-      final data = snapshot.docs.first.data();
-      final email = (data['email'] as String?)?.trim();
-
-      if (email == null || email.isEmpty) return null;
-
-      return email;
+      final result = await callable.call({'memberCode': memberCode});
+      if (result.data is Map) {
+        final data = result.data as Map;
+        final email = data['email']?.toString().trim();
+        return (email != null && email.isNotEmpty) ? email : null;
+      }
+      return null;
+    } on FirebaseFunctionsException catch (e) {
+      debugPrint('[AuthService] Member code lookup failed: ${e.code}');
+      return null;
     } catch (e) {
       debugPrint('[AuthService] Member code lookup failed: $e');
       return null;

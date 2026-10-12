@@ -99,7 +99,7 @@ class _AddUserScreenState extends State<AddUserScreen> {
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(
         content: Text(
-          'User added successfully. Login credentials have been sent to the user\'s email.',
+          'User added successfully. Welcome email submitted to mail server (mailbox delivery unconfirmed).',
         ),
         backgroundColor: AppColors.statusResolvedText,
         duration: Duration(seconds: 4),

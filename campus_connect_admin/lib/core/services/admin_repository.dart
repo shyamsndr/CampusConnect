@@ -87,6 +87,13 @@ class AdminRepository extends ChangeNotifier {
         return;
       }
 
+      // Only Active admin accounts can access the portal.
+      if (data['status'] != 'Active') {
+        await _auth.signOut();
+        _isAuthenticated = false;
+        return;
+      }
+
       // Restore admin profile information from Firestore.
       _adminName = data['name']?.toString() ?? 'Administrator';
       _adminEmail = data['email']?.toString() ?? user.email ?? '';
@@ -145,6 +152,12 @@ class AdminRepository extends ChangeNotifier {
       if (data == null || data['role'] != 'Admin') {
         await _auth.signOut();
         return 'Access denied. This account is not an administrator.';
+      }
+
+      // Only Active admin accounts can access the portal.
+      if (data['status'] != 'Active') {
+        await _auth.signOut();
+        return 'Your admin account is not active. Please contact the administrator.';
       }
 
       // Store profile information from Firestore.
@@ -532,6 +545,7 @@ class AdminRepository extends ChangeNotifier {
         case 'UNAUTHORIZED':
         case 'FORBIDDEN':
           return 'You are not authorized to add users.';
+        case 'INVALID_EMAIL_DOMAIN':
         case 'INVALID_DATA':
           return e.message ??
               'Some fields are invalid. Please check your input.';

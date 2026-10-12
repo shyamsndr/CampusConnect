@@ -14,9 +14,11 @@ import {
   checkMemberCodeExists,
   createUserProfile,
   deleteUserProfile,
+  getUserProfile,
 } from "./services/user_service";
+import { processNewComplaint } from "./services/complaint_service";
 import {generateTemporaryPassword} from "./utils/password_generator";
-import {validateUserData} from "./utils/validators";
+import {validateEmailDomainDns, validateUserData} from "./utils/validators";
 
 interface CreateUserRequest {
   memberCode: string;
@@ -50,6 +52,14 @@ export const createUser = onCall(async (request) => {
     );
   }
 
+  if (callerDoc.data()?.status !== "Active") {
+    throw new HttpsError(
+      "permission-denied",
+      "Your admin account is not active.",
+      {code: "ACCOUNT_NOT_ACTIVE"},
+    );
+  }
+
   // ── 3. Validate and normalise input data ────────────────────────────────────
   const raw = request.data as Partial<CreateUserRequest>;
 
@@ -72,6 +82,14 @@ export const createUser = onCall(async (request) => {
   if (validationError) {
     throw new HttpsError("invalid-argument", validationError, {
       code: "INVALID_DATA",
+    });
+  }
+
+  // ── 3b. Validate mail-routing DNS records where feasible ───────────────────
+  const dnsError = await validateEmailDomainDns(email);
+  if (dnsError) {
+    throw new HttpsError("invalid-argument", dnsError, {
+      code: "INVALID_EMAIL_DOMAIN",
     });
   }
 
@@ -138,7 +156,7 @@ export const createUser = onCall(async (request) => {
     firestoreCreated = true;
 
     // ── 8. Send welcome email ─────────────────────────────────────────────────
-    await sendWelcomeEmail({
+    const emailResult = await sendWelcomeEmail({
       to: email,
       name,
       memberCode,
@@ -149,8 +167,16 @@ export const createUser = onCall(async (request) => {
 
     return {
       success: true,
-      message: "User added successfully. Login credentials have been sent to the user's email.",
+      message: "User added successfully. Login credentials have been sent for delivery (SMTP submission accepted; mailbox delivery unconfirmed).",
       userId: uid,
+      emailStatus: {
+        submitted: emailResult.accepted,
+        messageId: emailResult.messageId,
+        smtpResponse: emailResult.response,
+        confirmedDelivery: false,
+        note: "Accepted by SMTP server for transmission. Note: SMTP acceptance does not guarantee final inbox delivery.",
+      },
+      ...(process.env.FUNCTIONS_EMULATOR === "true" ? {temporaryPassword} : {}),
     };
   } catch (error: unknown) {
     // ── Rollback ────────────────────────────────────────────────────────────
@@ -219,6 +245,87 @@ export const createUser = onCall(async (request) => {
       "internal",
       "Unable to create the user. Please try again.",
       {code: "FIREBASE_ERROR"},
+    );
+  }
+});
+
+// ── Member Code → Email Lookup ───────────────────────────────────────────────
+// Public callable (no auth required) used by the mobile app to resolve a
+// member code into an email address during the login flow.
+// Returns only the email — no other profile data is exposed.
+export const lookupEmailByMemberCode = onCall(async (request) => {
+  const memberCode = ((request.data?.memberCode ?? "") as string).trim().toUpperCase();
+
+  if (!memberCode) {
+    throw new HttpsError(
+      "invalid-argument",
+      "Member code is required.",
+      {code: "INVALID_DATA"},
+    );
+  }
+
+  const snapshot = await adminDb
+    .collection("USERS")
+    .where("member_code", "==", memberCode)
+    .limit(1)
+    .get();
+
+  if (snapshot.empty) {
+    throw new HttpsError(
+      "not-found",
+      "No account found with this member code.",
+      {code: "NOT_FOUND"},
+    );
+  }
+
+  const email = snapshot.docs[0].data().email as string;
+
+  return {email};
+});
+
+// ── Complaint Submission (Phase 2 AI Detection) ─────────────────────────────
+export const submitComplaint = onCall(async (request) => {
+  if (!request.auth) {
+    throw new HttpsError(
+      "unauthenticated",
+      "You must be logged in to report an issue.",
+      { code: "UNAUTHORIZED" }
+    );
+  }
+
+  const uid = request.auth.uid;
+
+  // ── Verify account status is Active ──────────────────────────────────────
+  const callerProfile = await getUserProfile(uid);
+
+  if (!callerProfile) {
+    throw new HttpsError(
+      "permission-denied",
+      "User profile not found.",
+      {code: "PROFILE_NOT_FOUND"},
+    );
+  }
+
+  if (callerProfile.status !== "Active") {
+    throw new HttpsError(
+      "permission-denied",
+      "Your account is not active. Please verify your email or contact the administrator.",
+      {code: "ACCOUNT_NOT_ACTIVE"},
+    );
+  }
+
+  try {
+    const result = await processNewComplaint(request.data, uid);
+    return result;
+  } catch (error) {
+    console.error("[submitComplaint] Error:", error);
+    if (error instanceof HttpsError) {
+      throw error;
+    }
+    throw new HttpsError(
+      "internal",
+      "Failed to submit complaint.",
+      { code: "INTERNAL_ERROR" }
     );
   }
 });

@@ -1,6 +1,7 @@
 import 'dart:io';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:cloud_functions/cloud_functions.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'package:flutter/foundation.dart';
@@ -13,9 +14,11 @@ class ComplaintService {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   final FirebaseStorage _storage = FirebaseStorage.instance;
   final FirebaseAuth _auth = FirebaseAuth.instance;
+  final FirebaseFunctions _functions = FirebaseFunctions.instanceFor(
+    region: 'us-central1',
+  );
 
-  /// Submits a new complaint, generating exactly 1 ISSUE, 1 ISSUE_REPORT,
-  /// and 1 ISSUE_STATUS_HISTORY using a Firestore batch write.
+  /// Submits a new complaint using a backend Cloud Function for AI Duplicate Detection.
   Future<void> submitComplaint({
     required String title,
     required String description,
@@ -26,7 +29,6 @@ class ComplaintService {
     if (currentUser == null) {
       throw Exception('You must be logged in to report an issue.');
     }
-    final String uid = currentUser.uid;
 
     String? imageUrl;
 
@@ -46,59 +48,17 @@ class ComplaintService {
       }
     }
 
-    // 2. Prepare Firestore documents
-    final issueRef = _firestore.collection('ISSUES').doc();
-    final reportRef = _firestore.collection('ISSUE_REPORTS').doc();
-    final historyRef = _firestore.collection('ISSUE_STATUS_HISTORY').doc();
-
-    final now = FieldValue.serverTimestamp();
-
-    // 3. Batch Write
-    final batch = _firestore.batch();
-
-    // ISSUE
-    batch.set(issueRef, {
-      'issue_id': issueRef.id,
-      'title': title,
-      'description': description,
-      'location': location,
-      'primary_image_url': imageUrl,
-      'primary_report_id': reportRef.id,
-      'primary_reporter_id': uid,
-      'status': 'Open',
-      'priority': 'Medium',
-      'created_at': now,
-      'updated_at': now,
-      'closed_at': null,
-    });
-
-    // ISSUE_REPORT
-    batch.set(reportRef, {
-      'report_id': reportRef.id,
-      'issue_id': issueRef.id,
-      'user_id': uid,
-      'title': title,
-      'description': description,
-      'location': location,
-      'image_url': imageUrl,
-      'created_at': now,
-    });
-
-    // ISSUE_STATUS_HISTORY
-    batch.set(historyRef, {
-      'history_id': historyRef.id,
-      'issue_id': issueRef.id,
-      'old_status': null,
-      'new_status': 'Open',
-      'changed_by': uid,
-      'changed_at': now,
-    });
-
-    // 4. Commit Batch
+    // 2. Call Cloud Function
     try {
-      await batch.commit();
+      final callable = _functions.httpsCallable('submitComplaint');
+      await callable.call({
+        'title': title,
+        'description': description,
+        'location': location,
+        'imageUrl': imageUrl,
+      });
     } catch (e) {
-      debugPrint('[ComplaintService] Firestore batch write failed: $e');
+      debugPrint('[ComplaintService] Cloud Function call failed: $e');
       throw Exception('Failed to submit the complaint. Please try again.');
     }
   }

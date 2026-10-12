@@ -1,4 +1,5 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:cloud_functions/cloud_functions.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_storage/firebase_storage.dart';
@@ -34,12 +35,15 @@ Future<void> main() async {
 
     FirebaseFirestore.instance.useFirestoreEmulator(host, 8080);
     await FirebaseAuth.instance.useAuthEmulator(host, 9099);
+    FirebaseFunctions.instanceFor(
+      region: 'us-central1',
+    ).useFunctionsEmulator(host, 5001);
     await FirebaseStorage.instance.useStorageEmulator(host, 9199);
 
     debugPrint('[Firebase] Emulator host: $host');
     debugPrint(
       '[Firebase] Connected to local Emulators '
-      '(Auth: $host:9099, Firestore: $host:8080, Storage: $host:9199)',
+      '(Auth: $host:9099, Firestore: $host:8080, Functions: $host:5001, Storage: $host:9199)',
     );
   } else {
     debugPrint(

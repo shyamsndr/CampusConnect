@@ -20,3 +20,20 @@ backend/.claude/
 **/windows/flutter/generated_plugin_registrant.cc
 **/windows/flutter/generated_plugin_registrant.h
 **/windows/flutter/generated_plugins.cmake
+
+# Environment variables and secrets
+.env
+.env.*
+!.env.example
+
+# Firebase service account credentials
+service-account.json
+*service-account*.json
+*-service-account*.json
+
+# Local emulator data and logs
+emulator-data/
+*-debug.log
+
+# Dependencies
+node_modules/
