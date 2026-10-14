@@ -11,6 +11,7 @@ class NotificationModel {
   final String title;
   final String message;
   final String eventId;
+  final String complaintId;
   final DateTime createdAt;
   final bool isRead;
 
@@ -21,6 +22,7 @@ class NotificationModel {
     required this.title,
     required this.message,
     required this.eventId,
+    this.complaintId = '',
     required this.createdAt,
     required this.isRead,
   });
@@ -42,6 +44,7 @@ class NotificationModel {
       title: (data['title'] as String?)?.trim() ?? '',
       message: (data['message'] as String?)?.trim() ?? '',
       eventId: (data['event_id'] as String?)?.trim() ?? '',
+      complaintId: (data['complaint_id'] as String?)?.trim() ?? '',
       createdAt: createdAt,
       isRead: (data['is_read'] as bool?) ?? false,
     );

@@ -461,6 +461,40 @@ class AdminRepository extends ChangeNotifier {
         'changed_at': FieldValue.serverTimestamp(),
       });
 
+      // Notify the primary reporter and all affected users linked via ISSUE_REPORTS.
+      final recipientUids = <String>{};
+      if (complaint.submittedBy.isNotEmpty) {
+        recipientUids.add(complaint.submittedBy);
+      }
+
+      // Query ISSUE_REPORTS for all affected users linked to this issue.
+      final reportsSnap = await _firestore
+          .collection('ISSUE_REPORTS')
+          .where('issue_id', isEqualTo: id)
+          .get();
+
+      for (final doc in reportsSnap.docs) {
+        final uid = (doc.data()['user_id'] as String?)?.trim();
+        if (uid != null && uid.isNotEmpty) {
+          recipientUids.add(uid);
+        }
+      }
+
+      for (final uid in recipientUids) {
+        final notifRef = _firestore.collection('NOTIFICATIONS').doc();
+        batch.set(notifRef, {
+          'notification_id': notifRef.id,
+          'user_id': uid,
+          'type': 'complaint_status_changed',
+          'title': 'Complaint Update',
+          'message': 'Your complaint "${complaint.title}" is now $newStatus.',
+          'complaint_id': id,
+          'event_id': '',
+          'created_at': FieldValue.serverTimestamp(),
+          'is_read': false,
+        });
+      }
+
       await batch.commit();
     } catch (e) {
       debugPrint('[AdminRepository] Failed to update complaint status: $e');

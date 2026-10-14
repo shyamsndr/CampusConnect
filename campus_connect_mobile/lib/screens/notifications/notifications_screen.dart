@@ -1,10 +1,12 @@
-﻿import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 
 import '../../core/constants/app_colors.dart';
 import '../../core/models/event_model.dart';
+import '../../core/models/issue_model.dart';
 import '../../core/models/notification_model.dart';
 import '../../core/services/auth_service.dart';
+import '../complaints/complaint_detail_screen.dart';
 import '../events/event_details_screen.dart';
 
 /// Displays the authenticated user's in-app notification list, streamed
@@ -105,10 +107,11 @@ class NotificationsScreen extends StatelessWidget {
   }
 
   // ─────────────────────────────────────────────────────────────
-  // NAVIGATE TO EVENT DETAILS
+  // ─────────────────────────────────────────────────────────────
+  // NAVIGATE TO NOTIFICATION TARGET (EVENT OR COMPLAINT)
   // ─────────────────────────────────────────────────────────────
 
-  Future<void> _openEvent(
+  Future<void> _openNotificationTarget(
     BuildContext context,
     NotificationModel notification,
   ) async {
@@ -116,6 +119,59 @@ class NotificationsScreen extends StatelessWidget {
     _markRead(notification.notificationId);
 
     if (!context.mounted) return;
+
+    if (notification.type == 'complaint_status_changed' &&
+        notification.complaintId.isNotEmpty) {
+      // Show a loading indicator while we fetch the complaint.
+      showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (_) => const Center(child: CircularProgressIndicator()),
+      );
+
+      try {
+        final doc = await FirebaseFirestore.instance
+            .collection('ISSUES')
+            .doc(notification.complaintId)
+            .get();
+
+        if (!context.mounted) return;
+        Navigator.pop(context); // dismiss loading dialog
+
+        if (!doc.exists) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text(
+                'This complaint is no longer available.',
+                style: TextStyle(fontSize: 14),
+              ),
+              duration: Duration(seconds: 3),
+            ),
+          );
+          return;
+        }
+
+        final complaint = IssueModel.fromFirestore(doc);
+
+        if (!context.mounted) return;
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (_) => ComplaintDetailScreen(complaint: complaint),
+          ),
+        );
+      } catch (e) {
+        if (!context.mounted) return;
+        Navigator.pop(context); // dismiss loading dialog on error
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Unable to load complaint details. Please try again.'),
+            duration: Duration(seconds: 3),
+          ),
+        );
+      }
+      return;
+    }
 
     if (notification.eventId.isEmpty) return;
 
@@ -218,6 +274,7 @@ class NotificationsScreen extends StatelessWidget {
       'event_updated' => Icons.edit_calendar_rounded,
       'event_cancelled' => Icons.event_busy_rounded,
       'event_republished' => Icons.event_repeat_rounded,
+      'complaint_status_changed' => Icons.assignment_turned_in_rounded,
       _ => Icons.notifications_rounded,
     };
   }
@@ -228,6 +285,7 @@ class NotificationsScreen extends StatelessWidget {
       'event_updated' => const Color(0xFF7C3AED),
       'event_cancelled' => Colors.redAccent,
       'event_republished' => const Color(0xFF059669),
+      'complaint_status_changed' => const Color(0xFFD97706),
       _ => AppColors.textGrey,
     };
   }
@@ -405,7 +463,7 @@ class NotificationsScreen extends StatelessWidget {
                   accent: accent,
                   icon: _iconFor(n.type),
                   timeAgo: _timeAgo(n.createdAt),
-                  onTap: () => _openEvent(context, n),
+                  onTap: () => _openNotificationTarget(context, n),
                 );
               },
             ),
