@@ -186,7 +186,7 @@ class _ComplaintDetailsScreenState extends State<ComplaintDetailsScreen> {
                         _buildMetaItem(
                           icon: Icons.flag_outlined,
                           label: 'Priority',
-                          value: '${complaint.priority} (${complaint.priorityScore} pts)',
+                          value: complaint.priority,
                         ),
                       ],
                     ),
@@ -293,42 +293,6 @@ class _ComplaintDetailsScreenState extends State<ComplaintDetailsScreen> {
                         }
                         return _buildStatusTimeline(snapshot.data ?? []);
                       },
-                    ),
-
-                    const SizedBox(height: 32),
-                    const Divider(height: 1),
-                    const SizedBox(height: 24),
-
-                    // Automatic Priority Breakdown Section
-                    const Text(
-                      'Automated Priority Breakdown',
-                      style: TextStyle(
-                        fontSize: 15,
-                        fontWeight: FontWeight.w600,
-                        color: AppColors.textDark,
-                      ),
-                    ),
-                    const SizedBox(height: 6),
-                    Text(
-                      'Calculated automatically: ${complaint.priorityScore} pts (Reporters: ${complaint.reporterCount} × 10, Age: ${((complaint.status == 'Closed' && complaint.closedAt != null ? complaint.closedAt! : DateTime.now()).difference(complaint.reportedAt).inDays.clamp(0, 30))}d × 2${complaint.safetyRisk ? ', Safety Risk Detected: +50 (High Priority)' : ''})',
-                      style: const TextStyle(fontSize: 13, color: AppColors.textGrey),
-                    ),
-                    const SizedBox(height: 12),
-                    Row(
-                      children: [
-                        StatusBadge.fromStatus(complaint.priority),
-                        const SizedBox(width: 12),
-                        Text(
-                          complaint.safetyRisk
-                              ? 'Safety hazard keywords detected in description.'
-                              : 'Priority determined by reporter count and unresolved duration.',
-                          style: TextStyle(
-                            fontSize: 13,
-                            color: complaint.safetyRisk ? const Color(0xFFDC2626) : AppColors.textGrey,
-                            fontWeight: complaint.safetyRisk ? FontWeight.w500 : FontWeight.normal,
-                          ),
-                        ),
-                      ],
                     ),
 
                     const SizedBox(height: 32),

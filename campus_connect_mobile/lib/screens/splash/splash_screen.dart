@@ -1,5 +1,3 @@
-import 'dart:async';
-
 import 'package:flutter/material.dart';
 
 import '../../core/constants/app_colors.dart';
@@ -17,39 +15,50 @@ class SplashScreen extends StatefulWidget {
 }
 
 class _SplashScreenState extends State<SplashScreen> {
+  bool _hasNavigated = false;
+
   @override
   void initState() {
     super.initState();
-    _navigate();
+    widget.authService.addListener(_onAuthChanged);
+    _checkAndNavigate();
   }
 
-  Future<void> _navigate() async {
-    // Show the splash for at least 2 seconds for branding.
-    await Future.delayed(const Duration(seconds: 2));
+  @override
+  void dispose() {
+    widget.authService.removeListener(_onAuthChanged);
+    super.dispose();
+  }
 
-    // Wait until AuthService has finished restoring the session.
-    // In most cases the session check finishes within those 2 seconds.
-    while (widget.authService.isInitializing) {
-      await Future.delayed(const Duration(milliseconds: 100));
-    }
+  void _onAuthChanged() {
+    _checkAndNavigate();
+  }
 
-    if (!mounted) return;
+  void _checkAndNavigate() {
+    if (_hasNavigated) return;
+    if (widget.authService.isInitializing) return;
 
-    if (widget.authService.isAuthenticated) {
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(
-          builder: (_) => MainScreen(authService: widget.authService),
-        ),
-      );
-    } else {
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(
-          builder: (_) => LoginScreen(authService: widget.authService),
-        ),
-      );
-    }
+    _hasNavigated = true;
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+
+      if (widget.authService.isAuthenticated) {
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(
+            builder: (_) => MainScreen(authService: widget.authService),
+          ),
+        );
+      } else {
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(
+            builder: (_) => LoginScreen(authService: widget.authService),
+          ),
+        );
+      }
+    });
   }
 
   @override
