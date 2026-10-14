@@ -444,7 +444,11 @@ class AdminRepository extends ChangeNotifier {
 
       // Update ISSUES document with new status.
       final issueRef = _firestore.collection('ISSUES').doc(id);
-      batch.update(issueRef, {'status': newStatus});
+      final Map<String, dynamic> updateData = {'status': newStatus};
+      if (newStatus == 'Closed') {
+        updateData['closed_at'] = FieldValue.serverTimestamp();
+      }
+      batch.update(issueRef, updateData);
 
       // Record the status change in ISSUE_STATUS_HISTORY.
       final historyRef = _firestore.collection('ISSUE_STATUS_HISTORY').doc();

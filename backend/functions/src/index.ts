@@ -1,5 +1,6 @@
 import {onCall, HttpsError} from "firebase-functions/v2/https";
 import {onDocumentCreated} from "firebase-functions/v2/firestore";
+import {onSchedule} from "firebase-functions/v2/scheduler";
 import {FieldValue} from "firebase-admin/firestore";
 
 import {adminDb, adminMessaging} from "./config/firebase";
@@ -16,7 +17,7 @@ import {
   deleteUserProfile,
   getUserProfile,
 } from "./services/user_service";
-import { processNewComplaint } from "./services/complaint_service";
+import { processNewComplaint, calculatePriorityScore } from "./services/complaint_service";
 import {generateTemporaryPassword} from "./utils/password_generator";
 import {validateEmailDomainDns, validateUserData} from "./utils/validators";
 
@@ -327,6 +328,57 @@ export const submitComplaint = onCall(async (request) => {
       "Failed to submit complaint.",
       { code: "INTERNAL_ERROR" }
     );
+  }
+});
+
+// ── Scheduled Automatic Priority Recalculation (Aging Unresolved Complaints) ──
+// Runs every 12 hours to update priority scores for Open and In Progress issues as they age.
+// Closed issues are explicitly excluded (their priority does not increase over time).
+export const recalculateActiveIssuePriorities = onSchedule("every 12 hours", async (event) => {
+  console.log("[recalculateActiveIssuePriorities] Starting scheduled priority recalculation...");
+
+  const activeIssuesSnapshot = await adminDb
+    .collection("ISSUES")
+    .where("status", "in", ["Open", "In Progress"])
+    .get();
+
+  if (activeIssuesSnapshot.empty) {
+    console.log("[recalculateActiveIssuePriorities] No active issues to recalculate.");
+    return;
+  }
+
+  const batch = adminDb.batch();
+  let updatedCount = 0;
+  const now = new Date();
+
+  for (const doc of activeIssuesSnapshot.docs) {
+    const data = doc.data();
+    const reporterCount = typeof data.reporter_count === "number" ? data.reporter_count : 1;
+    const createdAt = data.created_at?.toDate ? data.created_at.toDate() : now;
+    const safetyRisk = Boolean(data.safety_risk);
+    const currentPriority = data.priority;
+
+    const calc = calculatePriorityScore({
+      reporterCount,
+      createdAt,
+      safetyRisk,
+      now,
+    });
+
+    if (calc.priority !== currentPriority) {
+      batch.update(doc.ref, {
+        priority: calc.priority,
+        updated_at: FieldValue.serverTimestamp(),
+      });
+      updatedCount++;
+    }
+  }
+
+  if (updatedCount > 0) {
+    await batch.commit();
+    console.log(`[recalculateActiveIssuePriorities] Successfully updated priorities for ${updatedCount} active issue(s).`);
+  } else {
+    console.log("[recalculateActiveIssuePriorities] All active issue priorities are already up to date.");
   }
 });
 

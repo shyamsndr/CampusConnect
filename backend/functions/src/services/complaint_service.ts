@@ -3,24 +3,54 @@ import { adminDb } from "../config/firebase";
 import { FieldValue } from "firebase-admin/firestore";
 import { GoogleGenAI } from "@google/genai";
 import { defineString } from "firebase-functions/params";
+import {
+  extractComplaintEntities,
+  normalizeLocation,
+  evaluateComplaintMatch,
+  CandidateIssueData,
+} from "./duplicate_detection";
 
 const geminiApiKey = defineString("GEMINI_API_KEY");
 
-// Threshold for semantic similarity. 0.8 is a reasonable starting point for text-embedding-004
-const SIMILARITY_THRESHOLD = 0.8;
+// ── Rule-Based Safety Keyword Matcher ─────────────────────────────────────────
+const SAFETY_PATTERNS: RegExp[] = [
+  /\b(fire|smoke|spark|sparks|sparking|short\s*circuit|burning|explosion|explode|exploding)\b/i,
+  /\b(electric\s*shock|exposed\s*wire|exposed\s*wires|live\s*wire|live\s*wires|electrocution)\b/i,
+  /\b(ceiling\s*fall|ceiling\s*collapsed?|wall\s*collapsed?|structural\s*damage)\b/i,
+  /\b(broken\s*glass|shattered\s*glass|gas\s*leak|chemical\s*spill|flood|flooding)\b/i,
+  /\b(danger|dangerous|hazard|hazardous|emergency|injury|injured)\b/i,
+];
 
-function cosineSimilarity(vecA: number[], vecB: number[]): number {
-  if (vecA.length !== vecB.length) return 0;
-  let dotProduct = 0;
-  let normA = 0;
-  let normB = 0;
-  for (let i = 0; i < vecA.length; i++) {
-    dotProduct += vecA[i] * vecB[i];
-    normA += vecA[i] * vecA[i];
-    normB += vecB[i] * vecB[i];
+export function detectSafetyRisk(text: string): boolean {
+  if (!text) return false;
+  return SAFETY_PATTERNS.some((pattern) => pattern.test(text));
+}
+
+export function calculatePriorityScore(params: {
+  reporterCount: number;
+  createdAt: Date;
+  safetyRisk: boolean;
+  closedAt?: Date | null;
+  now?: Date;
+}): { score: number; priority: "Low" | "Medium" | "High"; safetyRisk: boolean } {
+  const { reporterCount, createdAt, safetyRisk, closedAt, now = new Date() } = params;
+
+  // Use closedAt if available to freeze elapsed time for closed complaints
+  const refDate = closedAt ? closedAt : now;
+  const elapsedDays = Math.min(30, Math.max(0, Math.floor((refDate.getTime() - createdAt.getTime()) / (1000 * 60 * 60 * 24))));
+
+  const score = (reporterCount * 10) + (elapsedDays * 2) + (safetyRisk ? 50 : 0);
+
+  let priority: "Low" | "Medium" | "High";
+  if (safetyRisk || score >= 50) {
+    priority = "High";
+  } else if (score >= 20) {
+    priority = "Medium";
+  } else {
+    priority = "Low";
   }
-  if (normA === 0 || normB === 0) return 0;
-  return dotProduct / (Math.sqrt(normA) * Math.sqrt(normB));
+
+  return { score, priority, safetyRisk };
 }
 
 export async function processNewComplaint(data: any, uid: string) {
@@ -30,18 +60,33 @@ export async function processNewComplaint(data: any, uid: string) {
     throw new HttpsError("invalid-argument", "Title, description, and location are required.");
   }
 
+  // 1. Extract domain entities, asset, category, fault, and normalized location
+  const entities = extractComplaintEntities(title, description, location);
+  const normalizedLoc = normalizeLocation(location);
+
+  console.log(`[processNewComplaint] Extracted entities for report by user ${uid}:`, {
+    title,
+    location,
+    normalizedLocation: normalizedLoc.canonical,
+    asset: entities.asset,
+    category: entities.category,
+    faultType: entities.faultType,
+  });
+
   let newEmbedding: number[] | null = null;
 
-  // 1. Generate embedding for the new complaint
+  // 2. Generate embedding focused on asset, category, and problem description
+  // Note: We exclude raw location string from the embedding to prevent shared location
+  // names (e.g. "lab", "room") from falsely inflating semantic similarity across different problems.
   try {
     const ai = new GoogleGenAI({ apiKey: geminiApiKey.value() });
-    const textToEmbed = `Title: ${title}\nDescription: ${description}\nLocation: ${location}`;
-    
+    const textToEmbed = `Asset: ${entities.asset}\nCategory: ${entities.category}\nTitle: ${title}\nDescription: ${description}`;
+
     const response = await ai.models.embedContent({
       model: "gemini-embedding-001",
       contents: textToEmbed,
     });
-    
+
     if (response.embeddings && response.embeddings.length > 0) {
       newEmbedding = response.embeddings[0].values ?? null;
       console.log(`[processNewComplaint] Embedding generated successfully (dimensions: ${newEmbedding?.length ?? 0})`);
@@ -50,91 +95,148 @@ export async function processNewComplaint(data: any, uid: string) {
     }
   } catch (error) {
     const errMessage = error instanceof Error ? error.message : String(error);
-    console.error("[processNewComplaint] AI Embedding failed:", errMessage);
-    // Fallback: continue without an embedding, which will force a new issue creation
+    console.error("[processNewComplaint] AI Embedding failed or skipped:", errMessage);
+    // Graceful fallback: continue without an embedding; deterministic entity & token evaluation will be used
   }
 
   let matchedIssueId: string | null = null;
 
-  // 2. Find similar issues if embedding succeeded
-  if (newEmbedding) {
-    try {
-      const activeIssuesSnapshot = await adminDb
-        .collection("ISSUES")
-        .where("status", "in", ["Open", "In Progress"])
-        .get();
+  // 3. Find duplicate issues among active ("Open", "In Progress") issues
+  try {
+    const activeIssuesSnapshot = await adminDb
+      .collection("ISSUES")
+      .where("status", "in", ["Open", "In Progress"])
+      .get();
 
-      const candidateIds = activeIssuesSnapshot.docs.map((doc) => doc.id);
-      console.log(`[processNewComplaint] Retrieved ${candidateIds.length} candidate issues:`, candidateIds);
+    const candidateDocs = activeIssuesSnapshot.docs;
+    console.log(`[processNewComplaint] Evaluating ${candidateDocs.length} active candidate issues`);
 
-      let bestMatchId: string | null = null;
-      let highestSimilarity = 0;
+    let bestMatchId: string | null = null;
+    let highestScore = -1;
 
-      for (const doc of activeIssuesSnapshot.docs) {
-        const issueData = doc.data();
-        if (issueData.embedding && Array.isArray(issueData.embedding)) {
-          const similarity = cosineSimilarity(newEmbedding, issueData.embedding);
-          console.log(`[processNewComplaint] Candidate [${doc.id}] "${issueData.title}" similarity: ${similarity.toFixed(4)} (threshold: ${SIMILARITY_THRESHOLD})`);
-          if (similarity > highestSimilarity) {
-            highestSimilarity = similarity;
-            bestMatchId = doc.id;
-          }
-        } else {
-          console.log(`[processNewComplaint] Candidate [${doc.id}] "${issueData.title}" has no embedding, skipping`);
-        }
+    for (const doc of candidateDocs) {
+      const issueData = doc.data() as CandidateIssueData;
+      const evaluation = evaluateComplaintMatch(
+        {
+          title,
+          description,
+          location,
+          embedding: newEmbedding,
+        },
+        issueData
+      );
+
+      console.log(
+        `[processNewComplaint] Candidate [${doc.id}] "${issueData.title}": isMatch=${evaluation.isMatch}, score=${evaluation.score.toFixed(4)}. Reasons: ${evaluation.reasons.join(" | ")}${evaluation.failureReason ? ` [REJECTED: ${evaluation.failureReason}]` : ""}`
+      );
+
+      if (evaluation.isMatch && evaluation.score > highestScore) {
+        highestScore = evaluation.score;
+        bestMatchId = doc.id;
       }
-
-      console.log(`[processNewComplaint] Best match candidate: ${bestMatchId ?? "none"}, highest similarity: ${highestSimilarity.toFixed(4)}, threshold: ${SIMILARITY_THRESHOLD}`);
-      
-      if (highestSimilarity >= SIMILARITY_THRESHOLD && bestMatchId) {
-        matchedIssueId = bestMatchId;
-      }
-    } catch (error) {
-      const errMessage = error instanceof Error ? error.message : String(error);
-      console.error("[processNewComplaint] Error searching for duplicates:", errMessage);
-      // Fallback: create new issue
     }
-  } else {
-    console.warn("[processNewComplaint] Skipping candidate search: no embedding available for new complaint");
+
+    if (bestMatchId) {
+      matchedIssueId = bestMatchId;
+      console.log(`[processNewComplaint] Selected confident match: ${matchedIssueId} (score: ${highestScore.toFixed(4)})`);
+    } else {
+      console.log("[processNewComplaint] No candidate matched all duplicate criteria. Creating new primary issue.");
+    }
+  } catch (error) {
+    const errMessage = error instanceof Error ? error.message : String(error);
+    console.error("[processNewComplaint] Error searching for duplicates:", errMessage);
+    // Fallback: create new issue safely
   }
 
-  console.log(`[processNewComplaint] Decision: ${matchedIssueId ? `LINK_TO_EXISTING (${matchedIssueId})` : "CREATE_NEW_PRIMARY_ISSUE"}`);
-
-  // 3. Perform Firestore writes using a Batch
-  const batch = adminDb.batch();
+  // 4. Perform Firestore writes using a Transaction for atomic concurrency protection
   const now = FieldValue.serverTimestamp();
-
   const reportRef = adminDb.collection("ISSUE_REPORTS").doc();
   const reportId = reportRef.id;
 
-  if (matchedIssueId) {
-    console.log(`[processNewComplaint] Confident duplicate found. Linking to issue: ${matchedIssueId}`);
-    
-    // Create ISSUE_REPORT linked to the matched issue
-    batch.set(reportRef, {
-      report_id: reportId,
-      issue_id: matchedIssueId,
-      user_id: uid,
-      title: title,
-      description: description,
-      location: location,
-      image_url: imageUrl || null,
-      created_at: now,
-    });
-    
-    // We DO NOT update the primary issue's status or create a new status history entry,
-    // as requested by the prompt.
+  let finalMatchedIssueId: string | null = null;
 
-  } else {
-    console.log("[processNewComplaint] No duplicate found. Creating new primary issue.");
-    
+  await adminDb.runTransaction(async (transaction) => {
+    if (matchedIssueId) {
+      const issueRef = adminDb.collection("ISSUES").doc(matchedIssueId);
+      const issueDoc = await transaction.get(issueRef);
+
+      // Verify the candidate issue still exists and is still Open or In Progress
+      if (issueDoc.exists && ["Open", "In Progress"].includes(issueDoc.data()?.status)) {
+        finalMatchedIssueId = matchedIssueId;
+
+        // Check if this distinct user already has a report for this issue
+        const existingReportsQuery = adminDb
+          .collection("ISSUE_REPORTS")
+          .where("issue_id", "==", matchedIssueId)
+          .where("user_id", "==", uid)
+          .limit(1);
+        const existingReportsSnap = await transaction.get(existingReportsQuery);
+        const isNewReporter = existingReportsSnap.empty;
+
+        // Create ISSUE_REPORT linked to the matched issue
+        transaction.set(reportRef, {
+          report_id: reportId,
+          issue_id: matchedIssueId,
+          user_id: uid,
+          title: title,
+          description: description,
+          location: location,
+          image_url: imageUrl || null,
+          created_at: now,
+        });
+
+        // Compute updated priority if reporter count changes
+        const issueData = issueDoc.data() || {};
+        // Check if this incoming report mentions safety hazards
+        const newReportHasSafetyRisk = detectSafetyRisk(`${title} ${description}`);
+        const currentSafetyRisk = Boolean(issueData.safety_risk) || newReportHasSafetyRisk;
+
+        const currentReporterCount = typeof issueData.reporter_count === "number" ? issueData.reporter_count : 1;
+        const newReporterCount = isNewReporter ? currentReporterCount + 1 : currentReporterCount;
+        const createdAtDate = issueData.created_at?.toDate ? issueData.created_at.toDate() : new Date();
+
+        const priorityCalc = calculatePriorityScore({
+          reporterCount: newReporterCount,
+          createdAt: createdAtDate,
+          safetyRisk: currentSafetyRisk,
+        });
+
+        const updatePayload: Record<string, any> = {
+          updated_at: now,
+          priority: priorityCalc.priority,
+          safety_risk: currentSafetyRisk,
+        };
+
+        if (isNewReporter) {
+          updatePayload.reporter_count = FieldValue.increment(1);
+        }
+
+        transaction.update(issueRef, updatePayload);
+
+        console.log(`[processNewComplaint] Transactionally linked report ${reportId} to existing issue ${matchedIssueId} (isNewReporter=${isNewReporter}, safetyRisk=${currentSafetyRisk}, newPriority=${priorityCalc.priority})`);
+        return;
+      } else {
+        console.warn(`[processNewComplaint] Matched issue ${matchedIssueId} was closed or deleted concurrently; creating new primary issue`);
+      }
+    }
+
+    // No matched issue (or candidate closed concurrently) -> create new primary issue
     const issueRef = adminDb.collection("ISSUES").doc();
     const issueId = issueRef.id;
     const historyRef = adminDb.collection("ISSUE_STATUS_HISTORY").doc();
     const historyId = historyRef.id;
 
-    // Create primary ISSUE
-    batch.set(issueRef, {
+    // Detect safety hazards automatically from complaint text
+    const initialSafetyRisk = detectSafetyRisk(`${title} ${description}`);
+
+    // Initial priority score for reporter_count=1, elapsed=0, rule-based safetyRisk
+    const initialPriorityCalc = calculatePriorityScore({
+      reporterCount: 1,
+      createdAt: new Date(),
+      safetyRisk: initialSafetyRisk,
+    });
+
+    transaction.set(issueRef, {
       issue_id: issueId,
       title: title,
       description: description,
@@ -143,15 +245,21 @@ export async function processNewComplaint(data: any, uid: string) {
       primary_report_id: reportId,
       primary_reporter_id: uid,
       status: "Open",
-      priority: "Medium",
+      priority: initialPriorityCalc.priority,
+      reporter_count: 1,
+      safety_risk: initialSafetyRisk,
       created_at: now,
       updated_at: now,
       closed_at: null,
-      embedding: newEmbedding || null, // Store embedding for future comparisons
+      embedding: newEmbedding || null,
+      // Enriched metadata preserving compatibility
+      normalized_location: normalizedLoc.canonical,
+      category: entities.category,
+      asset: entities.asset,
+      problem_type: entities.faultType,
     });
 
-    // Create initial ISSUE_REPORT
-    batch.set(reportRef, {
+    transaction.set(reportRef, {
       report_id: reportId,
       issue_id: issueId,
       user_id: uid,
@@ -162,8 +270,7 @@ export async function processNewComplaint(data: any, uid: string) {
       created_at: now,
     });
 
-    // Create ISSUE_STATUS_HISTORY
-    batch.set(historyRef, {
+    transaction.set(historyRef, {
       history_id: historyId,
       issue_id: issueId,
       old_status: null,
@@ -171,13 +278,13 @@ export async function processNewComplaint(data: any, uid: string) {
       changed_by: uid,
       changed_at: now,
     });
-  }
 
-  await batch.commit();
+    console.log(`[processNewComplaint] Transactionally created new primary issue ${issueId} with report ${reportId}`);
+  });
 
   return {
     success: true,
-    matchedIssueId,
-    message: matchedIssueId ? "Added to existing issue." : "New issue created.",
+    matchedIssueId: finalMatchedIssueId,
+    message: finalMatchedIssueId ? "Added to existing issue." : "New issue created.",
   };
 }

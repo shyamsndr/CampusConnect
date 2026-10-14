@@ -121,6 +121,10 @@ class ComplaintModel {
   final String status; // 'Open', 'In Progress', 'Closed'
   final DateTime reportedAt;
   final String? photoUrl;
+  final int reporterCount;
+  final int severity; // 0-3
+  final bool safetyRisk;
+  final DateTime? closedAt;
   final List<AffectedUser> affectedUsers;
   final List<AdminComplaintStatusEntry> statusHistory;
 
@@ -135,9 +139,30 @@ class ComplaintModel {
     required this.status,
     required this.reportedAt,
     this.photoUrl,
+    this.reporterCount = 1,
+    this.severity = 0,
+    this.safetyRisk = false,
+    this.closedAt,
     this.affectedUsers = const [],
     this.statusHistory = const [],
   });
+
+  /// Computed priority score based on automatic rule-based formula:
+  /// (reporterCount * 10) + (elapsedDays * 2, capped at 30d) + (safetyRisk ? 50 : 0)
+  int get priorityScore {
+    final refDate = (status == 'Closed' && closedAt != null) ? closedAt! : DateTime.now();
+    final elapsedDays = refDate.difference(reportedAt).inDays.clamp(0, 30);
+    return (reporterCount * 10) +
+        (elapsedDays * 2) +
+        (safetyRisk ? 50 : 0);
+  }
+
+  /// Computed priority label: 'High' if safetyRisk or score >= 50, 'Medium' if score >= 20, else 'Low'.
+  String get computedPriority {
+    if (safetyRisk || priorityScore >= 50) return 'High';
+    if (priorityScore >= 20) return 'Medium';
+    return 'Low';
+  }
 
   factory ComplaintModel.fromFirestore(DocumentSnapshot doc) {
     final data = doc.data() as Map<String, dynamic>? ?? {};
@@ -146,6 +171,11 @@ class ComplaintModel {
     DateTime parseTimestamp(dynamic raw) {
       if (raw is Timestamp) return raw.toDate();
       return now;
+    }
+
+    DateTime? parseNullableTimestamp(dynamic raw) {
+      if (raw is Timestamp) return raw.toDate();
+      return null;
     }
 
     return ComplaintModel(
@@ -159,6 +189,10 @@ class ComplaintModel {
       status: (data['status'] as String?)?.trim() ?? 'Open',
       reportedAt: parseTimestamp(data['created_at']),
       photoUrl: data['primary_image_url'] as String?,
+      reporterCount: (data['reporter_count'] as num?)?.toInt() ?? 1,
+      severity: (data['severity'] as num?)?.toInt() ?? 0,
+      safetyRisk: (data['safety_risk'] as bool?) ?? false,
+      closedAt: parseNullableTimestamp(data['closed_at']),
       affectedUsers: [],
       statusHistory: [],
     );
@@ -175,6 +209,10 @@ class ComplaintModel {
     String? status,
     DateTime? reportedAt,
     String? photoUrl,
+    int? reporterCount,
+    int? severity,
+    bool? safetyRisk,
+    DateTime? closedAt,
     List<AffectedUser>? affectedUsers,
     List<AdminComplaintStatusEntry>? statusHistory,
   }) {
@@ -189,6 +227,10 @@ class ComplaintModel {
       status: status ?? this.status,
       reportedAt: reportedAt ?? this.reportedAt,
       photoUrl: photoUrl ?? this.photoUrl,
+      reporterCount: reporterCount ?? this.reporterCount,
+      severity: severity ?? this.severity,
+      safetyRisk: safetyRisk ?? this.safetyRisk,
+      closedAt: closedAt ?? this.closedAt,
       affectedUsers: affectedUsers ?? this.affectedUsers,
       statusHistory: statusHistory ?? this.statusHistory,
     );
