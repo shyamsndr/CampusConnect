@@ -3,7 +3,8 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 /// Represents a single document from the Firestore USERS collection.
 ///
 /// Field names match the snake_case schema written by the Admin Cloud Function:
-///   member_code, name, email, role, department, phone, status, created_at
+///   member_code, name, email, role, department, phone, status, created_at,
+///   password_change_required
 class UserModel {
   final String uid;
   final String memberCode;
@@ -14,6 +15,7 @@ class UserModel {
   final String phone;
   final String status;
   final DateTime createdAt;
+  final bool passwordChangeRequired;
 
   const UserModel({
     required this.uid,
@@ -25,6 +27,7 @@ class UserModel {
     required this.phone,
     required this.status,
     required this.createdAt,
+    required this.passwordChangeRequired,
   });
 
   /// Creates a [UserModel] from a Firestore document snapshot.
@@ -50,6 +53,7 @@ class UserModel {
       phone: (data['phone'] as String?)?.trim() ?? '-',
       status: (data['status'] as String?)?.trim() ?? 'Unknown',
       createdAt: createdAt,
+      passwordChangeRequired: data['password_change_required'] as bool? ?? false,
     );
   }
 }

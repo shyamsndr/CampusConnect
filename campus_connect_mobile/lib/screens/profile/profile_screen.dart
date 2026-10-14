@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 
 import '../../core/constants/app_colors.dart';
 import '../../core/services/auth_service.dart';
+import '../auth/change_password_screen.dart';
 import '../auth/login_screen.dart';
 import '../notifications/notifications_screen.dart';
 
@@ -174,6 +175,59 @@ class ProfileScreen extends StatelessWidget {
 
               // ── Notifications row ─────────────────────────────────────────
               _NotificationsRow(authService: authService),
+
+              const SizedBox(height: 12),
+
+              // ── Change Password row ────────────────────────────────────────
+              GestureDetector(
+                onTap: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => ChangePasswordScreen(
+                        authService: authService,
+                        isFirstLogin: false,
+                      ),
+                    ),
+                  );
+                },
+                child: Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 14,
+                  ),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(14),
+                    border: Border.all(color: AppColors.borderGrey),
+                  ),
+                  child: const Row(
+                    children: [
+                      Icon(
+                        Icons.lock_outlined,
+                        color: AppColors.primaryBlue,
+                        size: 20,
+                      ),
+                      SizedBox(width: 14),
+                      Expanded(
+                        child: Text(
+                          'Change Password',
+                          style: TextStyle(
+                            color: AppColors.textDark,
+                            fontSize: 14,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                      ),
+                      Icon(
+                        Icons.chevron_right_rounded,
+                        color: AppColors.textGrey,
+                        size: 20,
+                      ),
+                    ],
+                  ),
+                ),
+              ),
 
               const SizedBox(height: 16),
 

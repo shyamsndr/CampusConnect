@@ -187,6 +187,81 @@ class AuthService extends ChangeNotifier {
   }
 
   // ============================================================
+  // CHANGE PASSWORD
+  // ============================================================
+
+  /// Changes the current user's password via Firebase Authentication.
+  ///
+  /// Returns `null` on success, or a user-facing error message on failure.
+  /// If Firebase requires recent authentication, this method reauthenticates
+  /// using [currentPassword] before applying the new password.
+  ///
+  /// After updating the password the method reloads the user and refreshes
+  /// the ID token to ensure the session remains valid.
+  Future<String?> changePassword({
+    required String currentPassword,
+    required String newPassword,
+  }) async {
+    try {
+      final user = _auth.currentUser;
+      if (user == null || user.email == null) {
+        return 'You must be signed in to change your password.';
+      }
+
+      // Reauthenticate to satisfy Firebase's recent-login requirement.
+      final credential = EmailAuthProvider.credential(
+        email: user.email!,
+        password: currentPassword,
+      );
+
+      try {
+        await user.reauthenticateWithCredential(credential);
+      } on FirebaseAuthException catch (e) {
+        switch (e.code) {
+          case 'wrong-password':
+          case 'invalid-credential':
+          case 'invalid-login-credentials':
+            return 'Current password is incorrect.';
+          default:
+            debugPrint('[AuthService] Reauthentication failed: ${e.code} – ${e.message}');
+            return 'Unable to verify current password. Please try again.';
+        }
+      }
+
+      // Apply the new password.
+      try {
+        await user.updatePassword(newPassword);
+      } on FirebaseAuthException catch (e) {
+        switch (e.code) {
+          case 'weak-password':
+            return 'New password is too weak. Please use a stronger password.';
+          case 'requires-recent-login':
+            return 'Session expired. Please sign out and sign in again.';
+          default:
+            debugPrint('[AuthService] updatePassword failed: ${e.code} – ${e.message}');
+            return 'Unable to update password. Please try again.';
+        }
+      }
+
+      // Password has been changed in Firebase Auth at this point.
+      // Force a token refresh and reload user profile so the in-memory state is current.
+      try {
+        await user.reload();
+        await user.getIdToken(true);
+        await _loadUserProfile(user.uid);
+        notifyListeners();
+      } catch (e) {
+        debugPrint('[AuthService] Token/profile refresh after password change failed: $e');
+      }
+
+      return null;
+    } catch (e) {
+      debugPrint('[AuthService] Change password unexpected error: $e');
+      return 'Something went wrong. Please try again.';
+    }
+  }
+
+  // ============================================================
   // FCM TOKEN HANDLING
   // ============================================================
 
