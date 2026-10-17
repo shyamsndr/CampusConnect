@@ -19,6 +19,12 @@ service cloud.firestore {
         && get(/databases/$(database)/documents/USERS/$(request.auth.uid)).data.role == 'Admin';
     }
 
+    // Checks the caller's Firestore USERS document for Staff role.
+    function isStaff() {
+      return isAuthenticated()
+        && get(/databases/$(database)/documents/USERS/$(request.auth.uid)).data.role == 'Staff';
+    }
+
     // ── USERS ────────────────────────────────────────────────────────────────
     // Owner reads own doc. Admin reads any user doc (dashboard list + joins).
     // Only the fcm_token field may be updated by the owner (mobile FCM setup).
@@ -33,12 +39,37 @@ service cloud.firestore {
       allow create, delete: if false;
     }
 
+    // Helper function to validate event fields
+    function isValidEventData(data) {
+      return data.title is string && data.title.size() > 0 && data.title.size() <= 200
+        && data.venue is string && data.venue.size() > 0 && data.venue.size() <= 200
+        && data.status in ['published', 'cancelled']
+        && data.event_date is timestamp;
+    }
+
     // ── EVENTS ───────────────────────────────────────────────────────────────
     // Any authenticated user can read events (mobile app + admin portal).
-    // Only admins can create, update or delete events.
+    // Admins can create, update, and delete all events.
+    // Staff can create events setting themselves as creator_id.
+    // Staff can update or delete only events where they are the creator_id,
+    // and cannot change the creator_id on update.
+    // Existing legacy events without creator_id are manageable by Admin.
     match /EVENTS/{eventId} {
       allow read: if isAuthenticated();
-      allow write: if isAdmin();
+
+      allow create: if (isAdmin() && isValidEventData(request.resource.data))
+                   || (isStaff()
+                       && request.resource.data.creator_id == request.auth.uid
+                       && isValidEventData(request.resource.data));
+
+      allow update: if (isAdmin() && isValidEventData(request.resource.data))
+                   || (isStaff()
+                       && resource.data.creator_id == request.auth.uid
+                       && request.resource.data.creator_id == resource.data.creator_id
+                       && isValidEventData(request.resource.data));
+
+      allow delete: if isAdmin()
+                   || (isStaff() && resource.data.creator_id == request.auth.uid);
     }
 
     // ── NOTIFICATIONS ─────────────────────────────────────────────────────────

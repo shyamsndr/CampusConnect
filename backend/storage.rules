@@ -4,7 +4,17 @@ service firebase.storage {
 
     // ── Event poster images ──────────────────────────────────────────────────
     // Readable by any authenticated user (mobile app + admin portal).
-    // Writable by admins only (verified via Firestore USERS document).
+    // Staff can upload, update, and delete posters only in their own folder:
+    // `events/posters/{userId}/{fileName}`.
+    // Admins can upload, update, and delete in any folder including root `events/posters/{fileName}`.
+    match /events/posters/{userId}/{fileName} {
+      allow read: if request.auth != null;
+      allow write: if request.auth != null
+        && (firestore.get(/databases/(default)/documents/USERS/$(request.auth.uid)).data.role == 'Admin'
+            || (firestore.get(/databases/(default)/documents/USERS/$(request.auth.uid)).data.role == 'Staff'
+                && request.auth.uid == userId));
+    }
+
     match /events/posters/{fileName} {
       allow read: if request.auth != null;
       allow write: if request.auth != null

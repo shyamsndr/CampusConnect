@@ -42,6 +42,8 @@ class AdminRepository extends ChangeNotifier {
   String get adminName => _adminName;
   String get adminEmail => _adminEmail;
   String get adminRole => _adminRole;
+  User? get currentUser => _auth.currentUser;
+  String get currentUserId => _auth.currentUser?.uid ?? '';
 
   /// Starts Firebase session restoration.
   ///

@@ -203,6 +203,10 @@ class _AddEventScreenState extends State<AddEventScreen> {
         createdBy:
             widget.eventToEdit?.createdBy ??
             widget.repository.adminName.ifEmpty('Admin'),
+        creatorId:
+            (widget.eventToEdit != null && widget.eventToEdit!.creatorId.isNotEmpty)
+                ? widget.eventToEdit!.creatorId
+                : widget.repository.currentUserId,
         status: _selectedStatus,
       );
 

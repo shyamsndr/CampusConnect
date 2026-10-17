@@ -1,5 +1,5 @@
 import {onCall, HttpsError} from "firebase-functions/v2/https";
-import {onDocumentCreated} from "firebase-functions/v2/firestore";
+import {onDocumentCreated, onDocumentWritten} from "firebase-functions/v2/firestore";
 import {onSchedule} from "firebase-functions/v2/scheduler";
 import {FieldValue} from "firebase-admin/firestore";
 
@@ -453,5 +453,105 @@ export const sendNotificationOnCreate = onDocumentCreated("NOTIFICATIONS/{notifi
         console.error(`[Notification ${notificationId}] Failed to remove invalid FCM token for user ${userId}:`, cleanupError);
       }
     }
+  }
+});
+
+// ── 10. Event Notification Fan-Out Trigger ──────────────────────────────────
+// Automatically notifies all Student and Staff users whenever an event is created
+// or its details/status are updated (by Admin or Staff).
+export const onEventWritten = onDocumentWritten("EVENTS/{eventId}", async (event) => {
+  const eventId = event.params.eventId;
+  const before = event.data?.before?.exists ? event.data.before.data() : null;
+  const after = event.data?.after?.exists ? event.data.after.data() : null;
+
+  // Event deleted or both null — no notification needed
+  if (!after) {
+    return;
+  }
+
+  const eventTitle = (after.title || "Campus Event").trim();
+  const newStatus = (after.status || "published").toLowerCase();
+  const oldStatus = before ? (before.status || "published").toLowerCase() : null;
+
+  let type = "";
+  let notifTitle = "";
+  let notifMessage = "";
+
+  if (!before) {
+    // New event created
+    type = "event_created";
+    notifTitle = "New Event Added";
+    notifMessage = `${eventTitle} has been added.`;
+  } else {
+    // Existing event updated
+    if (newStatus === "cancelled" && oldStatus !== "cancelled") {
+      type = "event_cancelled";
+      notifTitle = "Event Cancelled";
+      notifMessage = `${eventTitle} has been cancelled.`;
+    } else if (newStatus === "published" && oldStatus === "cancelled") {
+      type = "event_republished";
+      notifTitle = "Event Re-published";
+      notifMessage = `${eventTitle} has been re-published and is now available.`;
+    } else {
+      // Check if user-facing event fields actually changed
+      const titleChanged = before.title !== after.title;
+      const venueChanged = before.venue !== after.venue;
+      const timeChanged = before.event_time !== after.event_time;
+      const dateChanged = before.event_date?.seconds !== after.event_date?.seconds;
+      const descChanged = before.description !== after.description;
+
+      // Only notify if meaningful user-facing fields changed
+      if (titleChanged || venueChanged || timeChanged || dateChanged || descChanged) {
+        type = "event_updated";
+        notifTitle = "Event Updated";
+        notifMessage = `${eventTitle} details have been updated.`;
+      } else {
+        // No meaningful changes (e.g. only updated_at timestamp changed) — skip notification
+        return;
+      }
+    }
+  }
+
+  try {
+    // Fetch all Student and Staff users
+    const usersSnapshot = await adminDb
+      .collection("USERS")
+      .where("role", "in", ["Student", "Staff"])
+      .get();
+
+    if (usersSnapshot.empty) {
+      console.log(`[onEventWritten] No Student/Staff users to notify for event ${eventId}`);
+      return;
+    }
+
+    // Write notifications in batches of up to 500
+    const BATCH_SIZE = 400;
+    const docs = usersSnapshot.docs;
+    const now = FieldValue.serverTimestamp();
+
+    for (let i = 0; i < docs.length; i += BATCH_SIZE) {
+      const chunk = docs.slice(i, i + BATCH_SIZE);
+      const batch = adminDb.batch();
+
+      for (const userDoc of chunk) {
+        const notifRef = adminDb.collection("NOTIFICATIONS").doc();
+        batch.set(notifRef, {
+          notification_id: notifRef.id,
+          user_id: userDoc.id,
+          type: type,
+          title: notifTitle,
+          message: notifMessage,
+          event_id: eventId,
+          created_at: now,
+          is_read: false,
+        });
+      }
+
+      await batch.commit();
+    }
+
+    console.log(`[onEventWritten] Successfully fanned out ${type} notifications for event ${eventId} to ${docs.length} users.`);
+  } catch (error) {
+    console.error(`[onEventWritten] Error generating notifications for event ${eventId}:`, error);
   }
 });

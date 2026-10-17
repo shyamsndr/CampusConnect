@@ -2,20 +2,49 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import '../../core/constants/app_colors.dart';
 import '../../core/models/event_model.dart';
+import '../../core/services/auth_service.dart';
 import '../../widgets/common/event_poster_image.dart';
 import 'event_details_screen.dart';
+import 'event_form_screen.dart';
 
 class EventsScreen extends StatelessWidget {
-  const EventsScreen({super.key});
+  final AuthService? authService;
+
+  const EventsScreen({super.key, this.authService});
 
   @override
   Widget build(BuildContext context) {
     // Current date set to start of today for comparing upcoming event dates
     final now = DateTime.now();
     final todayStart = DateTime(now.year, now.month, now.day);
+    final userRole = authService?.currentUser?.role;
+    final canManageEvents = userRole == 'Staff' || userRole == 'Admin';
 
     return Scaffold(
       backgroundColor: AppColors.background,
+      floatingActionButton: canManageEvents
+          ? FloatingActionButton.extended(
+              onPressed: () {
+                if (authService != null) {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => MobileEventFormScreen(
+                        authService: authService!,
+                      ),
+                    ),
+                  );
+                }
+              },
+              backgroundColor: AppColors.primaryBlue,
+              foregroundColor: Colors.white,
+              icon: const Icon(Icons.add, size: 20),
+              label: const Text(
+                'Add Event',
+                style: TextStyle(fontWeight: FontWeight.w600),
+              ),
+            )
+          : null,
       appBar: AppBar(
         backgroundColor: AppColors.background,
         elevation: 0,
@@ -148,7 +177,10 @@ class EventsScreen extends StatelessWidget {
                       Navigator.push(
                         context,
                         MaterialPageRoute(
-                          builder: (_) => EventDetailsScreen(event: event),
+                          builder: (_) => EventDetailsScreen(
+                            event: event,
+                            authService: authService,
+                          ),
                         ),
                       );
                     },

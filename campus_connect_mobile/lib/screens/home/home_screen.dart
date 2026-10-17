@@ -405,7 +405,10 @@ class _HomeScreenState extends State<HomeScreen> {
                       Navigator.push(
                         context,
                         MaterialPageRoute(
-                          builder: (_) => EventDetailsScreen(event: event),
+                          builder: (_) => EventDetailsScreen(
+                            event: event,
+                            authService: widget.authService,
+                          ),
                         ),
                       );
                     },

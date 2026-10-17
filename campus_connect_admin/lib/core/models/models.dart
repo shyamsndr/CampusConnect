@@ -248,6 +248,7 @@ class EventModel {
   final DateTime createdAt;
   final DateTime updatedAt;
   final String createdBy;
+  final String creatorId;
   final String status; // 'published', 'cancelled'
 
   const EventModel({
@@ -261,6 +262,7 @@ class EventModel {
     required this.createdAt,
     required this.updatedAt,
     required this.createdBy,
+    this.creatorId = '',
     required this.status,
   });
 
@@ -296,6 +298,7 @@ class EventModel {
       createdAt: parseDateTime(data['created_at'], now),
       updatedAt: parseDateTime(data['updated_at'], now),
       createdBy: (data['created_by'] as String?)?.trim() ?? 'Admin',
+      creatorId: (data['creator_id'] as String?)?.trim() ?? '',
       status: (data['status'] as String?)?.trim() ?? 'published',
     );
   }
@@ -313,6 +316,7 @@ class EventModel {
       'created_at': Timestamp.fromDate(createdAt),
       'updated_at': Timestamp.fromDate(updatedAt),
       'created_by': createdBy,
+      'creator_id': creatorId,
       'status': status,
     };
   }
@@ -328,6 +332,7 @@ class EventModel {
     DateTime? createdAt,
     DateTime? updatedAt,
     String? createdBy,
+    String? creatorId,
     String? status,
   }) {
     return EventModel(
@@ -341,6 +346,7 @@ class EventModel {
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
       createdBy: createdBy ?? this.createdBy,
+      creatorId: creatorId ?? this.creatorId,
       status: status ?? this.status,
     );
   }

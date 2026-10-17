@@ -36,7 +36,7 @@ class _MainScreenState extends State<MainScreen> {
     final screens = [
       HomeScreen(authService: widget.authService),
       MyComplaintsScreen(authService: widget.authService),
-      const EventsScreen(),
+      EventsScreen(authService: widget.authService),
       ProfileScreen(authService: widget.authService),
     ];
 

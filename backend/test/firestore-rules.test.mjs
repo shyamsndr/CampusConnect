@@ -197,35 +197,105 @@ describe('EVENTS collection', () => {
 
   it('allows admin to create events', async () => {
     const db = testEnv.authenticatedContext(ADMIN_UID).firestore();
-    await assertSucceeds(setDoc(doc(db, 'EVENTS', 'event-new'), {
-      title: 'New Event', status: 'published',
+    await assertSucceeds(setDoc(doc(db, 'EVENTS', 'event-admin-new'), {
+      title: 'Admin Event', venue: 'Main Hall', status: 'published', creator_id: ADMIN_UID,
+      event_date: new Date(),
     }));
   });
 
-  it('allows admin to update events', async () => {
+  it('allows admin to update any event', async () => {
     const db = testEnv.authenticatedContext(ADMIN_UID).firestore();
     await assertSucceeds(updateDoc(doc(db, 'EVENTS', 'event1'), { status: 'cancelled' }));
   });
 
-  it('allows admin to delete events', async () => {
+  it('allows admin to delete any event', async () => {
     await testEnv.withSecurityRulesDisabled(async (ctx) => {
-      await setDoc(doc(ctx.firestore(), 'EVENTS', 'event-del'), { title: 'temp' });
+      await setDoc(doc(ctx.firestore(), 'EVENTS', 'event-admin-del'), {
+        title: 'temp', venue: 'Hall', status: 'published', event_date: new Date(),
+      });
     });
     const db = testEnv.authenticatedContext(ADMIN_UID).firestore();
-    await assertSucceeds(deleteDoc(doc(db, 'EVENTS', 'event-del')));
+    await assertSucceeds(deleteDoc(doc(db, 'EVENTS', 'event-admin-del')));
   });
 
-  it('denies non-admin from creating events', async () => {
+  it('allows staff to create events with their own uid as creator_id', async () => {
+    const db = testEnv.authenticatedContext(USER2_UID).firestore();
+    await assertSucceeds(setDoc(doc(db, 'EVENTS', 'event-staff-1'), {
+      title: 'Staff Event', venue: 'Seminar Hall', status: 'published', creator_id: USER2_UID,
+      event_date: new Date(),
+    }));
+  });
+
+  it('denies staff from creating events with invalid status', async () => {
+    const db = testEnv.authenticatedContext(USER2_UID).firestore();
+    await assertFails(setDoc(doc(db, 'EVENTS', 'event-staff-invalid-status'), {
+      title: 'Staff Event', venue: 'Seminar Hall', status: 'invalid_status', creator_id: USER2_UID,
+      event_date: new Date(),
+    }));
+  });
+
+  it('denies staff from creating events with someone else as creator_id', async () => {
+    const db = testEnv.authenticatedContext(USER2_UID).firestore();
+    await assertFails(setDoc(doc(db, 'EVENTS', 'event-staff-spoof'), {
+      title: 'Staff Spoof', venue: 'Seminar Hall', status: 'published', creator_id: ADMIN_UID,
+      event_date: new Date(),
+    }));
+  });
+
+  it('denies student from creating events', async () => {
     const db = testEnv.authenticatedContext(USER1_UID).firestore();
-    await assertFails(setDoc(doc(db, 'EVENTS', 'event-hack'), { title: 'Hack' }));
+    await assertFails(setDoc(doc(db, 'EVENTS', 'event-student-create'), {
+      title: 'Student Event', venue: 'Seminar Hall', status: 'published', creator_id: USER1_UID,
+      event_date: new Date(),
+    }));
   });
 
-  it('denies non-admin from updating events', async () => {
+  it('allows staff to update their own event without changing creator_id', async () => {
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      await setDoc(doc(ctx.firestore(), 'EVENTS', 'event-staff-owned'), {
+        title: 'Owned Event', venue: 'Auditorium', status: 'published', creator_id: USER2_UID,
+        event_date: new Date(),
+      });
+    });
+    const db = testEnv.authenticatedContext(USER2_UID).firestore();
+    await assertSucceeds(updateDoc(doc(db, 'EVENTS', 'event-staff-owned'), {
+      title: 'Owned Event Updated', creator_id: USER2_UID,
+    }));
+  });
+
+  it('denies staff from changing creator_id during update', async () => {
+    const db = testEnv.authenticatedContext(USER2_UID).firestore();
+    await assertFails(updateDoc(doc(db, 'EVENTS', 'event-staff-owned'), {
+      creator_id: ADMIN_UID,
+    }));
+  });
+
+  it('denies staff from updating another person event', async () => {
+    const db = testEnv.authenticatedContext(USER2_UID).firestore();
+    await assertFails(updateDoc(doc(db, 'EVENTS', 'event1'), { title: 'Hacked by staff' }));
+  });
+
+  it('denies staff from deleting another person event', async () => {
+    const db = testEnv.authenticatedContext(USER2_UID).firestore();
+    await assertFails(deleteDoc(doc(db, 'EVENTS', 'event1')));
+  });
+
+  it('allows staff to delete their own event', async () => {
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      await setDoc(doc(ctx.firestore(), 'EVENTS', 'event-staff-to-del'), {
+        title: 'To Delete', status: 'published', creator_id: USER2_UID,
+      });
+    });
+    const db = testEnv.authenticatedContext(USER2_UID).firestore();
+    await assertSucceeds(deleteDoc(doc(db, 'EVENTS', 'event-staff-to-del')));
+  });
+
+  it('denies student from updating any event', async () => {
     const db = testEnv.authenticatedContext(USER1_UID).firestore();
-    await assertFails(updateDoc(doc(db, 'EVENTS', 'event1'), { title: 'Hacked' }));
+    await assertFails(updateDoc(doc(db, 'EVENTS', 'event1'), { title: 'Hacked by student' }));
   });
 
-  it('denies non-admin from deleting events', async () => {
+  it('denies student from deleting any event', async () => {
     const db = testEnv.authenticatedContext(USER1_UID).firestore();
     await assertFails(deleteDoc(doc(db, 'EVENTS', 'event1')));
   });
