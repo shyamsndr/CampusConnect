@@ -404,14 +404,21 @@ export function areAssetsCompatible(
 
     // If one or both assets are unknown:
     // If both are unknown, allow compatibility based on other checks.
-    // If only one is unknown, keep conservative and reject.
+    // If only one is unknown, treat as compatible and defer to later checks.
     if (assetA === "unknown" && assetB === "unknown") {
       return {
         compatible: true,
         reason: `Both assets unknown, proceeding to other similarity checks`
       };
     }
-    // Otherwise, one known and one unknown -> not compatible
+    // One asset known, the other unknown – allow further checks (similarity, fault, etc.)
+    if (assetA === "unknown" || assetB === "unknown") {
+      return {
+        compatible: true,
+        reason: `One asset unknown ("${assetA}" vs "${assetB}"), deferring to other checks`
+      };
+    }
+    // Otherwise, assets are known but different – reject.
     return {
       compatible: false,
       reason: `Asset identification uncertain ("${assetA}" vs "${assetB}"). Remaining separate.`
