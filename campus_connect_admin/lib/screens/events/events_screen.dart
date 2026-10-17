@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../../core/constants/app_colors.dart';
 import '../../core/models/models.dart';
 import '../../core/services/admin_repository.dart';
+import '../../core/utils/image_utils.dart';
 import '../../widgets/common/status_badge.dart';
 
 /// Screen displaying campus events with options to add, edit, unpublish/publish, and delete events.
@@ -242,7 +243,7 @@ class EventsScreen extends StatelessWidget {
                                     ? ClipRRect(
                                         borderRadius: BorderRadius.circular(5),
                                         child: Image.network(
-                                          event.posterUrl,
+                                          sanitizeAdminImageUrl(event.posterUrl),
                                           fit: BoxFit.cover,
                                           errorBuilder: (_, _, _) => const Icon(
                                             Icons.event,

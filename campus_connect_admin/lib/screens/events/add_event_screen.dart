@@ -4,6 +4,7 @@ import 'package:image_picker/image_picker.dart';
 import '../../core/constants/app_colors.dart';
 import '../../core/models/models.dart';
 import '../../core/services/admin_repository.dart';
+import '../../core/utils/image_utils.dart';
 
 /// Screen for creating and editing campus events with Firebase Storage poster upload.
 class AddEventScreen extends StatefulWidget {
@@ -393,7 +394,7 @@ class _AddEventScreenState extends State<AddEventScreen> {
                                       child: ClipRRect(
                                         borderRadius: BorderRadius.circular(8),
                                         child: Image.network(
-                                          _existingPosterUrl!,
+                                          sanitizeAdminImageUrl(_existingPosterUrl),
                                           fit: BoxFit.cover,
                                           errorBuilder: (_, _, _) =>
                                               const Center(
